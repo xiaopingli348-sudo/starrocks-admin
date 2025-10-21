@@ -1,0 +1,2 @@
+# Clippy configuration for StarRocks Admin Backend
+allow-mixed-uninlined-format-args = true
