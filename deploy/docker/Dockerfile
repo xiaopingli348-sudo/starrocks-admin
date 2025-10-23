@@ -20,8 +20,10 @@ COPY frontend/ ./frontend/
 WORKDIR /app/frontend
 
 # Install dependencies and build
-RUN npm ci --only=production
+RUN npm ci --silent
 RUN npm run build -- --configuration production
+# Clean up dev dependencies to reduce image size
+RUN npm prune --production
 
 # Final stage
 FROM debian:bookworm-slim
@@ -41,8 +43,9 @@ RUN mkdir -p bin conf web lib data logs
 
 # Copy built artifacts
 COPY --from=builder /app/backend/target/release/starrocks-admin ./bin/
-COPY --from=builder /app/frontend/dist/ngx-admin/ ./web/
-COPY conf/ ./conf/
+COPY --from=builder /app/frontend/dist/ ./web/
+# Create default config
+RUN echo '[server]\nhost = "0.0.0.0"\nport = 8080\n\n[database]\nurl = "sqlite://data/starrocks-admin.db"\n\n[auth]\njwt_secret = "dev-secret-key-change-in-production"\njwt_expires_in = "24h"\n\n[cors]\nallow_origin = "http://localhost:4200"\n\n[logging]\nlevel = "info,starrocks_admin_backend=debug"\nfile = "logs/starrocks-admin.log"\n\n[static_config]\nenabled = true\nweb_root = "web"' > ./conf/config.toml
 
 # Set permissions
 RUN chown -R starrocks:starrocks /app
