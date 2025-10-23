@@ -11,6 +11,13 @@ pub async fn create_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> 
         tracing::debug!("Creating database directory: {:?}", dir);
         std::fs::create_dir_all(dir).ok();
     }
+    
+    // 确保数据库文件存在
+    let db_path = database_url.trim_start_matches("sqlite://");
+    if !std::path::Path::new(db_path).exists() {
+        tracing::debug!("Creating database file: {}", db_path);
+        std::fs::File::create(db_path).ok();
+    }
 
     tracing::debug!("Creating database pool with max_connections=10, acquire_timeout=5s");
     let pool = SqlitePoolOptions::new()
