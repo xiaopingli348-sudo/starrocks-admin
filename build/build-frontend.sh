@@ -32,7 +32,7 @@ cd "$FRONTEND_DIR"
 npm install
 
 echo -e "${YELLOW}[2/2]${NC} Building Angular frontend (production mode)..."
-npm run build --prod
+npm run build -- --configuration production
 
 # Copy built files
 echo -e "${YELLOW}[3/3]${NC} Copying built frontend files..."
