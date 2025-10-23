@@ -165,7 +165,7 @@ start_service() {
 
     # 设置环境变量
     export DATABASE_URL="${DATABASE_URL:-sqlite://$DATA_DIR/starrocks-admin.db}"
-    export HOST="${HOST:-0.0.0.0}"
+export HOST="${HOST:-0.0.0.0}"
     export PORT="${PORT:-8080}"
 
     # 显示配置信息
@@ -194,8 +194,8 @@ start_service() {
         echo "  - PID: $BACKEND_PID"
         echo "  - 健康检查: http://$HOST:$PORT/health"
         echo "  - Web UI: http://$HOST:$PORT"
-        echo ""
-        
+echo ""
+
         # 测试健康检查
         if curl -s "http://$HOST:$PORT/health" > /dev/null 2>&1; then
             echo -e "${GREEN}[健康检查]${NC} ✅ Backend运行正常"
