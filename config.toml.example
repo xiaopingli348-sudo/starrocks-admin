@@ -1,0 +1,24 @@
+# StarRocks Admin Backend Configuration Example
+# Copy this file to conf/config.toml and modify as needed
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[database]
+url = "sqlite://data/starrocks-admin.db"
+
+[auth]
+jwt_secret = "dev-secret-key-change-in-production"
+jwt_expires_in = "24h"
+
+[cors]
+allow_origin = "http://localhost:4200"
+
+[logging]
+level = "info,starrocks_admin_backend=debug"
+file = "logs/starrocks-admin.log"
+
+[static_config]
+enabled = true
+web_root = "web"
