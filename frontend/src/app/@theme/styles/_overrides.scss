@@ -1,0 +1,30 @@
+@import './themes';
+
+@mixin nb-overrides() {
+  nb-select.size-medium button {
+    padding: 0.4375rem 2.2rem 0.4375rem 1.125rem !important;
+
+    nb-icon {
+      right: 0.41rem !important;
+    }
+  }
+
+  // ng2-smart-table Actions column alignment - minimal fix for ngx-admin
+  ng2-smart-table {
+    .ng2-smart-actions {
+      text-align: center;
+      vertical-align: middle;
+    }
+    
+    // 表格列宽自适应
+    table {
+      table-layout: auto;
+      width: 100%;
+    }
+    
+    th, td {
+      white-space: nowrap;
+      min-width: fit-content;
+    }
+  }
+}

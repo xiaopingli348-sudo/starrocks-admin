@@ -1,0 +1,47 @@
+
+> ngx-admin@11.0.0 start
+> ng serve --host 0.0.0.0 --disable-host-check --host 0.0.0.0 --port 4200
+
+Option 'host' has been specified multiple times. The value '0.0.0.0' will be used.
+Warning: Running a server with --disable-host-check is a security risk. See https://medium.com/webpack/webpack-dev-server-middleware-security-issues-1489d950874a for more information.
+One or more browsers which are configured in the project's Browserslist configuration will be ignored as ES5 output is not supported by the Angular CLI.
+Ignored browsers: ie 11, kaios 2.5, op_mini all
+- Generating browser application bundles (phase: setup)...
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files                            | Names                      |  Raw Size
+vendor.js                                      | vendor                     |   5.18 MB |
+main.js                                        | main                       |   2.64 MB |
+styles.css, styles.js                          | styles                     |   1.80 MB |
+scripts.js                                     | scripts                    |   1.38 MB |
+polyfills.js                                   | polyfills                  | 401.75 kB |
+runtime.js                                     | runtime                    |  12.97 kB |
+
+| Initial Total              |  11.40 MB
+
+Lazy Chunk Files                               | Names                      |  Raw Size
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |   4.70 MB |
+src_app_pages_pages_module_ts.js               | pages-pages-module         | 306.02 kB |
+
+Build at: 2025-10-23T09:15:31.864Z - Hash: 18c3c4b65d154c89 - Time: 4414ms
+
+Warning: /home/oppo/Documents/starrocks-admin/frontend/node_modules/@nebular/eva-icons/fesm2020/nebular-eva-icons.mjs depends on 'eva-icons'. CommonJS or AMD dependencies can cause optimization bailouts.
+For more info see: https://angular.io/guide/build#configuring-commonjs-dependencies
+
+
+
+** Angular Live Development Server is listening on 0.0.0.0:4200, open your browser on http://localhost:4200/ **
+
+
+✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files | Names   | Raw Size
+main.js             | main    |  2.64 MB |
+runtime.js          | runtime | 12.97 kB |
+
+6 unchanged chunks
+
+Build at: 2025-10-23T10:21:42.353Z - Hash: 0a001a0c74d28a03 - Time: 2312ms
+
+✔ Compiled successfully.

@@ -1,0 +1,38 @@
+<div class="row">
+  <div class="col-12">
+    <nb-card>
+      <nb-card-header>
+        <div class="d-flex justify-content-between align-items-center">
+          <h5>Backend 节点 - {{ clusterName }}</h5>
+          <div class="d-flex align-items-center gap-2">
+            <button nbButton status="primary" size="small" (click)="loadBackends()">
+              <nb-icon icon="refresh-outline"></nb-icon>
+              刷新
+            </button>
+            <button
+              nbButton
+              [status]="autoRefresh ? 'success' : 'basic'"
+              size="small"
+              (click)="toggleAutoRefresh()"
+            >
+              <nb-icon [icon]="autoRefresh ? 'checkmark-circle-2-outline' : 'pause-circle-outline'"></nb-icon>
+              {{ autoRefresh ? '停止' : '自动' }}
+            </button>
+          </div>
+        </div>
+      </nb-card-header>
+      <nb-card-body>
+        <div *ngIf="loading" class="text-center">
+          <nb-spinner status="primary"></nb-spinner>
+        </div>
+
+        <ng2-smart-table
+          *ngIf="!loading"
+          [settings]="settings"
+          [source]="source"
+        >
+        </ng2-smart-table>
+      </nb-card-body>
+    </nb-card>
+  </div>
+</div>

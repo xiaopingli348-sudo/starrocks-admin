@@ -1,0 +1,65 @@
+<div class="row" *ngIf="!loading && cluster">
+  <div class="col-12">
+    <nb-card>
+      <nb-card-header>
+        <div class="d-flex justify-content-between align-items-center">
+          <h5>{{ cluster.name }}</h5>
+          <div>
+            <button nbButton status="info" size="small" (click)="editCluster()" class="me-2">
+              <nb-icon icon="edit-outline"></nb-icon> 编辑
+            </button>
+            <button nbButton status="danger" size="small" (click)="deleteCluster()">
+              <nb-icon icon="trash-outline"></nb-icon> 删除
+            </button>
+          </div>
+        </div>
+      </nb-card-header>
+      <nb-card-body>
+        <div class="row">
+          <div class="col-md-6">
+            <h6>基本信息</h6>
+            <table class="table">
+              <tr><td>集群名称:</td><td>{{ cluster.name }}</td></tr>
+              <tr><td>描述:</td><td>{{ cluster.description || '-' }}</td></tr>
+              <tr><td>FE 地址:</td><td>{{ cluster.fe_host }}:{{ cluster.fe_http_port }}</td></tr>
+              <tr><td>查询端口:</td><td>{{ cluster.fe_query_port }}</td></tr>
+              <tr><td>用户名:</td><td>{{ cluster.username }}</td></tr>
+              <tr><td>Catalog:</td><td>{{ cluster.catalog }}</td></tr>
+              <tr><td>创建时间:</td><td>{{ cluster.created_at | date:'yyyy-MM-dd HH:mm:ss' }}</td></tr>
+            </table>
+          </div>
+          <div class="col-md-6">
+            <h6>健康状态</h6>
+            <div *ngIf="health">
+              <nb-alert [status]="health.status === 'healthy' ? 'success' : health.status === 'warning' ? 'warning' : 'danger'">
+                <strong>{{ health.status }}</strong>
+              </nb-alert>
+              <div *ngFor="let check of health.checks" class="mb-2">
+                <nb-icon [icon]="check.status === 'ok' ? 'checkmark-circle-2' : 'alert-circle'"
+                         [status]="check.status === 'ok' ? 'success' : check.status === 'warning' ? 'warning' : 'danger'">
+                </nb-icon>
+                {{ check.name }}: {{ check.message }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-12">
+            <h6>快速导航</h6>
+            <div class="nav-buttons">
+              <button nbButton status="primary" (click)="navigateTo('backends')">Backend 节点</button>
+              <button nbButton status="primary" (click)="navigateTo('frontends')">Frontend 节点</button>
+              <button nbButton status="primary" (click)="navigateTo('queries')">查询管理</button>
+              <button nbButton status="primary" (click)="navigateTo('monitor')">监控指标</button>
+            </div>
+          </div>
+        </div>
+      </nb-card-body>
+    </nb-card>
+  </div>
+</div>
+
+<div *ngIf="loading" class="text-center">
+  <nb-spinner status="primary"></nb-spinner>
+</div>

@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css?family=Open+Sans:400,600,700&display=swap');
+
+// themes - our custom or/and out of the box themes
+@import 'themes';
+
+// framework component themes (styles tied to theme variables)
+@import '@nebular/theme/styles/globals';
+@import '@nebular/auth/styles/globals';
+
+@import 'bootstrap/scss/functions';
+@import 'bootstrap/scss/variables';
+@import 'bootstrap/scss/mixins';
+@import 'bootstrap/scss/grid';
+
+// loading progress bar theme
+@import './pace.theme';
+
+@import './layout';
+@import './overrides';
+
+// install the framework and custom global styles
+@include nb-install() {
+
+  // framework global styles
+  @include nb-theme-global();
+  @include nb-auth-global();
+
+  @include ngx-layout();
+  // loading progress bar
+  @include ngx-pace-theme();
+
+  @include nb-overrides();
+};
+
+// Dialog size classes (Bootstrap-compatible) with higher specificity
+nb-dialog-container.modal-lg,
+.modal-lg nb-dialog-container,
+.cdk-overlay-pane.modal-lg {
+  max-width: 1200px !important;
+  width: 1200px !important;
+}
+
+nb-dialog-container.modal-xl,
+.modal-xl nb-dialog-container,
+.cdk-overlay-pane.modal-xl {
+  max-width: 1140px !important;
+  width: 1140px !important;
+}
+
+nb-dialog-container.modal-sm,
+.modal-sm nb-dialog-container,
+.cdk-overlay-pane.modal-sm {
+  max-width: 300px !important;
+  width: 300px !important;
+}
+
+// Profile dialog scroll container - must be global for overlay
+.profile-scroll-container {
+  max-height: 70vh !important;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+
+  .profile-content-text {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

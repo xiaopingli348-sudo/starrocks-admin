@@ -1,0 +1,91 @@
+<nb-layout>
+  <nb-layout-column>
+    <div class="auth-container">
+      <nb-card>
+        <nb-card-header>
+          <div class="logo-container">
+            <div class="logo">
+              <nb-icon icon="database-outline" status="primary"></nb-icon>
+            </div>
+            <h1 class="title">StarRocks Admin</h1>
+            <small class="sub-title">Login to your account</small>
+          </div>
+        </nb-card-header>
+
+        <nb-card-body>
+          <!-- Alert Messages -->
+          <nb-alert *ngFor="let error of errors" status="danger" closable (close)="errors = []">
+            {{ error }}
+          </nb-alert>
+          <nb-alert *ngFor="let message of messages" status="success" closable (close)="messages = []">
+            {{ message }}
+          </nb-alert>
+
+          <form (ngSubmit)="login()" #form="ngForm">
+            <!-- Username -->
+            <div class="form-control-group">
+              <label class="label" for="input-username">Username:</label>
+              <input 
+                nbInput
+                fullWidth
+                [(ngModel)]="user.username"
+                #username="ngModel"
+                id="input-username"
+                name="username"
+                placeholder="Username"
+                autofocus
+                [status]="username.dirty ? (username.invalid  ? 'danger' : 'success') : 'basic'"
+                [required]="true"
+                [attr.aria-invalid]="username.invalid && username.touched ? true : null">
+              <ng-container *ngIf="username.invalid && username.touched">
+                <p class="caption status-danger" *ngIf="username.errors?.['required']">
+                  Username is required!
+                </p>
+              </ng-container>
+            </div>
+
+            <!-- Password -->
+            <div class="form-control-group">
+              <label class="label" for="input-password">Password:</label>
+              <input 
+                nbInput
+                fullWidth
+                [(ngModel)]="user.password"
+                #password="ngModel"
+                type="password"
+                id="input-password"
+                name="password"
+                placeholder="Password"
+                [status]="password.dirty ? (password.invalid  ? 'danger' : 'success') : 'basic'"
+                [required]="true"
+                [attr.aria-invalid]="password.invalid && password.touched ? true : null">
+              <ng-container *ngIf="password.invalid && password.touched">
+                <p class="caption status-danger" *ngIf="password.errors?.['required']">
+                  Password is required!
+                </p>
+              </ng-container>
+            </div>
+
+            <!-- Submit Button -->
+            <button 
+              nbButton 
+              fullWidth
+              status="primary"
+              size="large"
+              [disabled]="submitted || !form.valid"
+              [class.btn-pulse]="submitted">
+              <nb-icon *ngIf="submitted" icon="loader-outline" [options]="{animation: {type: 'pulse'}}"></nb-icon>
+              <span *ngIf="!submitted">Login</span>
+              <span *ngIf="submitted">Logging in...</span>
+            </button>
+          </form>
+
+          <!-- Register Link -->
+          <section class="another-action" aria-label="Register">
+            Don't have an account? <a class="text-link" routerLink="../register">Register</a>
+          </section>
+        </nb-card-body>
+      </nb-card>
+    </div>
+  </nb-layout-column>
+</nb-layout>

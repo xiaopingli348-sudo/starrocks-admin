@@ -13,6 +13,7 @@ backend/logs/
 backend/sqlite*
 
 
+
 # Frontend (from frontend)
 frontend/node_modules/
 frontend/.angular/
@@ -46,6 +47,7 @@ backend/logs/
 
 # Build artifacts
 /build/dist/
+/build/dist/web
 /web/
 *.tar.gz
 

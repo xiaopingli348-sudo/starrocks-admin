@@ -59,7 +59,7 @@ BACKEND_PID=$!
 sleep 3
 
 # Check backend health
-if curl -s http://10.119.43.216:8081/health > /dev/null 2>&1; then
+if curl -s http://0.0.0.0:8081/health > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Backend running (PID: $BACKEND_PID)${NC}"
 else
     echo -e "${YELLOW}⚠ Backend starting... (PID: $BACKEND_PID)${NC}"
@@ -74,8 +74,8 @@ echo -e "${GREEN}Development environment started!${NC}"
 echo -e ""
 echo -e "${BLUE}Access URLs:${NC}"
 echo -e "  Frontend: ${GREEN}http://localhost:4200${NC}"
-echo -e "  Backend:  ${GREEN}http://10.119.43.216:8081${NC}"
-echo -e "  API Docs: ${GREEN}http://10.119.43.216:8081/api-docs${NC}"
+echo -e "  Backend:  ${GREEN}http://0.0.0.0:8081${NC}"
+echo -e "  API Docs: ${GREEN}http://0.0.0.0:8081/api-docs${NC}"
 echo -e ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
 echo -e "${BLUE}════════════════════════════════════════${NC}"

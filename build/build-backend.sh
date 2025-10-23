@@ -66,7 +66,7 @@ DIST_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Set environment variables
 export DATABASE_URL="${DATABASE_URL:-sqlite:///tmp/starrocks-admin/starrocks-admin.db}"
-export HOST="${HOST:-10.119.43.216}"
+export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8081}"
 
 # Create database directory

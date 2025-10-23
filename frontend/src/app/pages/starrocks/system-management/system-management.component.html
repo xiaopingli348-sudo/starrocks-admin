@@ -1,0 +1,209 @@
+<div class="system-management-container">
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <nb-spinner size="large"></nb-spinner>
+    <p>Loading system functions...</p>
+  </div>
+
+  <!-- No Active Cluster Alert -->
+  <div *ngIf="!activeCluster && !loading">
+    <nb-card status="warning">
+      <nb-card-body>
+        <div class="d-flex align-items-center">
+          <nb-icon icon="alert-triangle-outline" pack="eva" class="mr-3" style="font-size: 2rem;"></nb-icon>
+          <div>
+            <h5 class="mb-2">请先选择激活集群</h5>
+            <p class="mb-0">系统管理功能需要先选择一个激活的集群才能使用。请前往 <a routerLink="/pages/starrocks/dashboard" class="text-primary">集群概览</a> 页面选择要管理的集群。</p>
+          </div>
+        </div>
+      </nb-card-body>
+    </nb-card>
+  </div>
+
+  <!-- Main View: Categories and Functions List -->
+  <div *ngIf="!selectedFunction && !loading && activeCluster" class="main-view">
+    <div class="page-header mb-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h3 class="mb-1">系统管理 | <span class="cluster-name-small">{{ activeCluster.name }}</span></h3>
+          <p class="text-muted mb-0">管理和监控 StarRocks 集群系统功能</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button nbButton status="primary" size="small" (click)="openAddFunctionDialog()">
+            <nb-icon icon="plus-outline"></nb-icon>
+            添加功能
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Categories Grid with Drag and Drop -->
+    <div class="categories-container" cdkDropList (cdkDropListDropped)="onCategoryDrop($event)">
+      <nb-card 
+        *ngFor="let category of categories; let i = index" 
+        cdkDrag
+        class="category-card" 
+        [status]="getCategoryColor(category.name)"
+        [attr.data-category]="category.name"
+      >
+        <nb-card-header>
+          <div class="category-header">
+            <div class="d-flex align-items-center">
+              <nb-icon icon="drag-outline" class="drag-handle mr-2"></nb-icon>
+              <nb-icon [icon]="getCategoryIcon(category.name)" pack="eva"></nb-icon>
+              <h3 class="ml-2 mb-0">{{ category.name }}</h3>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <button 
+                *ngIf="category.functions.length < 4" 
+                nbButton 
+                ghost 
+                size="tiny" 
+                status="success"
+                (click)="openAddFunctionDialog(category.name)"
+              >
+                <nb-icon icon="plus-outline"></nb-icon>
+              </button>
+              <button 
+                *ngIf="isCustomCategory(category.name)" 
+                nbButton 
+                ghost 
+                size="tiny" 
+                status="danger"
+                (click)="deleteCategory(category.name); $event.stopPropagation()"
+              >
+                <nb-icon icon="trash-2-outline"></nb-icon>
+              </button>
+              <nb-icon icon="drag-outline" class="drag-handle"></nb-icon>
+            </div>
+          </div>
+        </nb-card-header>
+        
+        <nb-card-body>
+          <div 
+            cdkDropList 
+            [cdkDropListData]="category.functions" 
+            (cdkDropListDropped)="onFunctionDrop($event, category)"
+            class="functions-list"
+          >
+            <div 
+              *ngFor="let function of category.functions; let j = index" 
+              cdkDrag
+              class="function-item"
+              [class.system-function]="function.isSystem"
+              (click)="executeCustomFunction(function)"
+            >
+              <div class="function-info">
+                <div class="d-flex align-items-center">
+                  <nb-icon icon="drag-outline" class="drag-handle mr-2"></nb-icon>
+                  <div class="flex-grow-1">
+                    <h4 class="mb-1">{{ function.functionName || function.name }}</h4>
+                    <p class="mb-1 text-muted">{{ function.description }}</p>
+                    <div class="function-meta">
+                      <span class="last-updated">
+                        <nb-icon icon="clock-outline"></nb-icon>
+                        {{ formatLastUpdated(function.updatedAt || function.last_updated) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="function-actions">
+                <button 
+                  nbButton 
+                  ghost 
+                  size="tiny" 
+                  status="warning"
+                  (click)="toggleFavorite(function.id); $event.stopPropagation()"
+                  [class.favorited]="function.isFavorited"
+                >
+                  <nb-icon [icon]="function.isFavorited ? 'star' : 'star-outline'"></nb-icon>
+                </button>
+                <button 
+                  *ngIf="!function.isSystem"
+                  nbButton 
+                  ghost 
+                  size="tiny" 
+                  status="info"
+                  (click)="editFunction(function); $event.stopPropagation()"
+                >
+                  <nb-icon icon="edit-outline"></nb-icon>
+                </button>
+                <button 
+                  *ngIf="!function.isSystem"
+                  nbButton 
+                  ghost 
+                  size="tiny" 
+                  status="danger"
+                  (click)="deleteFunction(function.id); $event.stopPropagation()"
+                >
+                  <nb-icon icon="trash-2-outline"></nb-icon>
+                </button>
+              </div>
+            </div>
+          </div>
+        </nb-card-body>
+      </nb-card>
+    </div>
+  </div>
+
+  <!-- Detail View: Function Data -->
+  <div *ngIf="selectedFunction && !loading" class="detail-view">
+    <div class="row">
+      <div class="col-12">
+        <nb-card>
+          <nb-card-header>
+            <div class="d-flex justify-content-between align-items-center w-100">
+              <div class="d-flex align-items-center gap-2">
+                <button nbButton ghost size="small" (click)="goBack()">
+                  <nb-icon icon="arrow-back-outline"></nb-icon>
+                </button>
+                <span class="header-separator">|</span>
+                <div>
+                  <h5 class="mb-0">{{ selectedFunction.name }}</h5>
+                  <small class="text-muted">{{ selectedFunction.description }}</small>
+                </div>
+              </div>
+              <button nbButton status="info" size="small" (click)="refreshCurrentFunction()" [disabled]="loading">
+                <nb-icon icon="refresh-outline"></nb-icon>
+                刷新
+              </button>
+            </div>
+          </nb-card-header>
+          
+          <nb-card-body>
+            <!-- 搜索过滤器紧凑布局 -->
+            <div class="search-section mb-3">
+              <div class="row g-2 align-items-center">
+                <div class="col-md-9 col-lg-10">
+                  <input nbInput fullWidth placeholder="搜索表格数据..." 
+                         [(ngModel)]="searchKeyword" (keyup.enter)="onSearch()">
+                </div>
+                <div class="col-md-3 col-lg-2">
+                  <button nbButton status="primary" fullWidth (click)="onSearch()" [disabled]="loading">
+                    <nb-icon icon="search-outline"></nb-icon>
+                    搜索
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 数据表格 -->
+            <div *ngIf="loading" class="text-center py-4">
+              <nb-spinner size="large" status="primary"></nb-spinner>
+            </div>
+
+            <ng2-smart-table *ngIf="!loading && functionData.length > 0"
+              [settings]="tableSettings" [source]="functionDataSource">
+            </ng2-smart-table>
+
+            <div *ngIf="!loading && functionData.length === 0" class="text-center py-5">
+              <nb-icon icon="info-outline" status="info" class="mb-2" style="font-size: 3rem; opacity: 0.3;"></nb-icon>
+              <p class="text-muted">暂无数据</p>
+            </div>
+          </nb-card-body>
+        </nb-card>
+      </div>
+    </div>
+  </div>
+</div>

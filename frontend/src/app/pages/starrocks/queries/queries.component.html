@@ -1,0 +1,329 @@
+<div class="row">
+  <div class="col-12">
+    <nb-card>
+      <nb-card-header>
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h5>查询管理</h5>
+            <small class="text-muted" *ngIf="activeCluster">
+              集群: {{ activeCluster.name }}
+            </small>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button nbButton status="primary" size="small" (click)="loadCurrentTab()" [disabled]="loading || !clusterId">
+              <nb-icon icon="refresh-outline"></nb-icon>
+              刷新
+            </button>
+            
+            <nb-select 
+              [(selected)]="selectedRefreshInterval" 
+              size="small" 
+              placeholder="间隔"
+              (selectedChange)="onRefreshIntervalChange($event)"
+              [disabled]="!clusterId"
+              style="min-width: 90px;"
+            >
+              <nb-option *ngFor="let option of refreshIntervalOptions" [value]="option.value">
+                {{ option.label }}
+              </nb-option>
+            </nb-select>
+            
+            <button 
+              nbButton 
+              [status]="autoRefresh ? 'success' : 'basic'" 
+              size="small" 
+              (click)="toggleAutoRefresh()"
+              [disabled]="!clusterId"
+            >
+              <nb-icon [icon]="autoRefresh ? 'checkmark-circle-2-outline' : 'pause-circle-outline'"></nb-icon>
+              {{ autoRefresh ? '停止' : '自动' }}
+            </button>
+          </div>
+        </div>
+      </nb-card-header>
+      <nb-card-body>
+        <!-- Tab Selector -->
+        <nb-tabset (changeTab)="selectTab($event.tabId)">
+          <!-- Real-time Query Tab -->
+          <nb-tab tabTitle="实时查询" tabId="realtime" [active]="selectedTab === 'realtime'">
+            <div class="realtime-query-container">
+              <!-- SQL Editor - Simplified -->
+              <div class="sql-editor-section">
+                <textarea 
+                  nbInput 
+                  fullWidth 
+                  rows="8"
+                  class="sql-editor"
+                  placeholder="输入 SQL 语句并执行... 例如: SELECT * FROM information_schema.tables"
+                  [(ngModel)]="sqlInput"
+                  [disabled]="executing">
+                </textarea>
+                
+                <div class="editor-toolbar">
+                  <div class="left-actions">
+                    <button 
+                      nbButton 
+                      status="primary" 
+                      (click)="executeSQL()" 
+                      [disabled]="executing || !clusterId || !sqlInput">
+                      <nb-icon icon="play-circle-outline"></nb-icon>
+                      {{ executing ? '执行中...' : '执行' }}
+                    </button>
+                    <button 
+                      nbButton 
+                      status="basic" 
+                      (click)="clearSQL()" 
+                      [disabled]="executing">
+                      <nb-icon icon="trash-2-outline"></nb-icon>
+                      清空
+                    </button>
+                    <button 
+                      nbButton 
+                      status="info" 
+                      (click)="formatSQL()" 
+                      [disabled]="executing || !sqlInput">
+                      <nb-icon icon="code-outline"></nb-icon>
+                      格式化
+                    </button>
+                  </div>
+                  <div class="right-actions">
+                    <span class="limit-label">限制:</span>
+                    <nb-select 
+                      [(selected)]="queryLimit" 
+                      size="tiny"
+                      [disabled]="executing">
+                      <nb-option *ngFor="let option of limitOptions" [value]="option.value">
+                        {{ option.label }}
+                      </nb-option>
+                    </nb-select>
+                  </div>
+                </div>
+                
+                <small class="hint-text">
+                  <nb-icon icon="info-outline"></nb-icon>
+                  SELECT 查询会自动添加 LIMIT 限制（如未指定）
+                </small>
+              </div>
+
+              <!-- Query Result -->
+              <nb-card *ngIf="queryResult">
+                <nb-card-header>
+                  <div class="result-header">
+                    <span>查询结果</span>
+                    <div class="result-actions">
+                      <nb-badge status="success" class="me-2">
+                        <nb-icon icon="clock-outline"></nb-icon>
+                        {{ executionTime }}ms
+                      </nb-badge>
+                      <nb-badge status="info" class="me-2">
+                        <nb-icon icon="list-outline"></nb-icon>
+                        {{ rowCount }} 行
+                      </nb-badge>
+                      <button 
+                        nbButton 
+                        size="tiny" 
+                        status="success"
+                        (click)="exportResults()">
+                        <nb-icon icon="download-outline"></nb-icon>
+                        导出
+                      </button>
+                    </div>
+                  </div>
+                </nb-card-header>
+                <nb-card-body>
+                  <ng2-smart-table 
+                    *ngIf="resultSettings" 
+                    [settings]="resultSettings" 
+                    [source]="realtimeResultSource">
+                  </ng2-smart-table>
+                  <div *ngIf="rowCount === 0" class="no-data-message">
+                    <nb-icon icon="inbox-outline"></nb-icon>
+                    <p>查询未返回任何数据</p>
+                  </div>
+                </nb-card-body>
+              </nb-card>
+            </div>
+          </nb-tab>
+
+          <!-- Running Queries Tab -->
+          <nb-tab tabTitle="运行中" tabId="running" [active]="selectedTab === 'running'">
+            <div *ngIf="loading" class="text-center mt-3"><nb-spinner status="primary"></nb-spinner></div>
+            <ng2-smart-table 
+              *ngIf="!loading" 
+              [settings]="runningSettings" 
+              [source]="runningSource">
+            </ng2-smart-table>
+          </nb-tab>
+          
+          <!-- History Queries Tab -->
+          <nb-tab tabTitle="历史查询" tabId="history" [active]="selectedTab === 'history'">
+            <!-- Search Filters -->
+            <div class="history-filters">
+              <div class="row">
+                <div class="col-md-4">
+                  <input 
+                    nbInput 
+                    fullWidth 
+                    placeholder="搜索 Query ID / SQL / 用户"
+                    [(ngModel)]="searchKeyword"
+                    (keyup.enter)="searchHistory()">
+                </div>
+                <div class="col-md-3">
+                  <input 
+                    nbInput 
+                    fullWidth 
+                    type="datetime-local"
+                    placeholder="开始时间"
+                    [(ngModel)]="searchStartTime">
+                </div>
+                <div class="col-md-3">
+                  <input 
+                    nbInput 
+                    fullWidth 
+                    type="datetime-local"
+                    placeholder="结束时间"
+                    [(ngModel)]="searchEndTime">
+                </div>
+                <div class="col-md-2">
+                  <button 
+                    nbButton 
+                    status="primary" 
+                    fullWidth
+                    (click)="searchHistory()">
+                    <nb-icon icon="search-outline"></nb-icon>
+                    搜索
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="loading" class="text-center mt-3"><nb-spinner status="primary"></nb-spinner></div>
+            
+            <ng2-smart-table 
+              *ngIf="!loading" 
+              [settings]="historySettings" 
+              [source]="historySource"
+              (edit)="onEditProfile($event)">
+            </ng2-smart-table>
+
+            <!-- Custom pagination -->
+            <div *ngIf="!loading && historyTotalCount > 0" class="pagination-container">
+              <div class="pagination-info">
+                <span>显示第 {{ (historyCurrentPage - 1) * historyPageSize + 1 }} - {{ Math.min(historyCurrentPage * historyPageSize, historyTotalCount) }} 条，共 {{ historyTotalCount }} 条</span>
+                <nb-select 
+                  [(selected)]="historyPageSize" 
+                  size="tiny"
+                  (selectedChange)="onHistoryPageSizeChange($event)"
+                  class="page-size-select">
+                  <nb-option [value]="5">5 条/页</nb-option>
+                  <nb-option [value]="10">10 条/页</nb-option>
+                  <nb-option [value]="20">20 条/页</nb-option>
+                  <nb-option [value]="50">50 条/页</nb-option>
+                  <nb-option [value]="100">100 条/页</nb-option>
+                </nb-select>
+              </div>
+              <div class="pagination-controls">
+                <button 
+                  nbButton 
+                  size="tiny" 
+                  status="basic"
+                  [disabled]="historyCurrentPage === 1"
+                  (click)="onHistoryPageChange(1)">
+                  <nb-icon icon="chevron-left-outline"></nb-icon><nb-icon icon="chevron-left-outline"></nb-icon>
+                </button>
+                <button 
+                  nbButton 
+                  size="tiny" 
+                  status="basic"
+                  [disabled]="historyCurrentPage === 1"
+                  (click)="onHistoryPageChange(historyCurrentPage - 1)">
+                  <nb-icon icon="chevron-left-outline"></nb-icon>
+                </button>
+                <span class="page-info">第 {{ historyCurrentPage }} / {{ historyTotalPages }} 页</span>
+                <button 
+                  nbButton 
+                  size="tiny" 
+                  status="basic"
+                  [disabled]="historyCurrentPage === historyTotalPages"
+                  (click)="onHistoryPageChange(historyCurrentPage + 1)">
+                  <nb-icon icon="chevron-right-outline"></nb-icon>
+                </button>
+                <button 
+                  nbButton 
+                  size="tiny" 
+                  status="basic"
+                  [disabled]="historyCurrentPage === historyTotalPages"
+                  (click)="onHistoryPageChange(historyTotalPages)">
+                  <nb-icon icon="chevron-right-outline"></nb-icon><nb-icon icon="chevron-right-outline"></nb-icon>
+                </button>
+              </div>
+            </div>
+          </nb-tab>
+
+          <!-- Profile Management Tab -->
+          <nb-tab tabTitle="Profile管理" tabId="profiles" [active]="selectedTab === 'profiles'">
+            <div class="profile-container">
+              <div *ngIf="loading" class="text-center mt-3"><nb-spinner status="primary"></nb-spinner></div>
+              <ng2-smart-table 
+                *ngIf="!loading" 
+                [settings]="profileSettings" 
+                [source]="profileSource"
+                (edit)="onProfileEdit($event)">
+              </ng2-smart-table>
+            </div>
+          </nb-tab>
+        </nb-tabset>
+      </nb-card-body>
+    </nb-card>
+  </div>
+</div>
+
+<!-- Profile Dialog Template -->
+<ng-template #profileDialog let-data let-ref="dialogRef">
+  <nb-card>
+    <nb-card-header>
+      <div class="d-flex justify-content-between align-items-center">
+        <h6>Query Profile</h6>
+        <button nbButton ghost status="basic" size="tiny" (click)="ref.close()">
+          <nb-icon icon="close-outline"></nb-icon>
+        </button>
+      </div>
+    </nb-card-header>
+    <nb-card-body *ngIf="currentProfile">
+      <div class="profile-info">
+        <p><strong>Query ID:</strong> {{ currentProfile.query_id }}</p>
+        <p><strong>SQL:</strong></p>
+        <pre class="sql-statement">{{ currentProfile.sql }}</pre>
+        <p><strong>执行时间:</strong> {{ currentProfile.execution_time_ms }} ms</p>
+        <p><strong>状态:</strong> {{ currentProfile.status }}</p>
+        <hr>
+        <p><strong>Profile 内容:</strong></p>
+        <pre class="profile-content">{{ currentProfile.profile_content }}</pre>
+      </div>
+    </nb-card-body>
+  </nb-card>
+</ng-template>
+
+<!-- Profile Detail Dialog Template -->
+<ng-template #profileDetailDialog let-data let-ref="dialogRef">
+  <nb-card accent="info">
+    <nb-card-header>
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+          <nb-icon icon="file-text-outline" status="info" class="me-2"></nb-icon>
+          <h5 class="mb-0">Query Profile 详情</h5>
+        </div>
+        <button nbButton ghost status="basic" size="small" (click)="ref.close()">
+          <nb-icon icon="close-outline"></nb-icon>
+        </button>
+      </div>
+    </nb-card-header>
+    <nb-card-body>
+      <nb-card accent="basic">
+        <nb-card-body class="profile-scroll-container">
+          <pre class="profile-content-text">{{ currentProfileDetail }}</pre>
+        </nb-card-body>
+      </nb-card>
+    </nb-card-body>
+  </nb-card>
+</ng-template>

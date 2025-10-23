@@ -93,7 +93,7 @@ jwt_secret = "dev-secret-key-change-in-production"
 jwt_expires_in = "24h"
 
 [cors]
-allow_origin = "http://10.119.43.216:4200"
+allow_origin = "http://0.0.0.0:4200"
 
 [logging]
 level = "debug"

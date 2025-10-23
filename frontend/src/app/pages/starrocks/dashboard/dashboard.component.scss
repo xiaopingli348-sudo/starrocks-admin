@@ -1,0 +1,10 @@
+// Dashboard styles - using ngx-admin native components only
+:host {
+  display: block;
+}
+
+// Minimal custom styles - rely on ngx-admin defaults
+.gap-2 {
+  gap: 0.5rem;
+}
+

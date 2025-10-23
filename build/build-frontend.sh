@@ -98,7 +98,7 @@ server {
     
     # Proxy API requests to backend
     location /api/ {
-        proxy_pass http://10.119.43.216:8081/api/;
+        proxy_pass http://0.0.0.0:8081/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }

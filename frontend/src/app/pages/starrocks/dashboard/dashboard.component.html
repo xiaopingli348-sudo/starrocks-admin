@@ -1,0 +1,110 @@
+<div class="row">
+  <div class="col-12">
+    <nb-card>
+      <nb-card-header>
+        <div class="d-flex justify-content-between align-items-center">
+          <h5>StarRocks 集群概览</h5>
+          <button nbButton status="primary" (click)="addCluster()">
+            <nb-icon icon="plus-outline"></nb-icon>
+            添加集群
+          </button>
+        </div>
+      </nb-card-header>
+      <nb-card-body>
+        <div *ngIf="loading" class="text-center">
+          <nb-spinner status="primary"></nb-spinner>
+        </div>
+
+        <div *ngIf="!loading && clusters.length === 0" class="text-center p-5">
+          <nb-icon icon="cloud-outline" status="basic" style="font-size: 4rem"></nb-icon>
+          <p class="mt-3">还没有集群，点击上方按钮添加</p>
+        </div>
+
+        <div *ngIf="!loading && clusters.length > 0" class="row">
+          <div *ngFor="let clusterCard of clusters" class="col-md-6 col-lg-4 mb-3">
+            <nb-card [status]="getStatusColor(clusterCard.health?.status)" [accent]="clusterCard.health?.status === 'healthy' ? 'success' : null">
+              <nb-card-header>
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="d-flex align-items-center gap-2">
+                    <h6 class="mb-0">{{ clusterCard.cluster.name }}</h6>
+                    <nb-badge 
+                      *ngIf="clusterCard.isActive" 
+                      text="当前激活" 
+                      status="success"
+                      position="top right"
+                    ></nb-badge>
+                  </div>
+                  <div class="d-flex align-items-center gap-2">
+                    <button 
+                      nbButton 
+                      ghost
+                      size="small"
+                      [status]="clusterCard.isActive ? 'warning' : 'basic'"
+                      [class.active-star]="clusterCard.isActive"
+                      (click)="toggleActiveCluster(clusterCard)"
+                      [nbTooltip]="clusterCard.isActive ? '点击取消激活' : '点击设为当前集群'"
+                      nbTooltipPlacement="top"
+                    >
+                      <nb-icon [icon]="clusterCard.isActive ? 'star' : 'star-outline'"></nb-icon>
+                    </button>
+                  </div>
+                </div>
+              </nb-card-header>
+              <nb-card-body>
+                <div class="mb-2">
+                  <small class="text-muted">FE 地址:</small>
+                  <div>{{ clusterCard.cluster.fe_host }}:{{ clusterCard.cluster.fe_http_port }}</div>
+                </div>
+
+                <div class="mb-2" *ngIf="clusterCard.cluster.description">
+                  <small class="text-muted">描述:</small>
+                  <div>{{ clusterCard.cluster.description }}</div>
+                </div>
+
+                <div class="mb-2" *ngIf="clusterCard.cluster.tags && clusterCard.cluster.tags.length > 0">
+                  <small class="text-muted">标签:</small>
+                  <div>
+                    <nb-badge
+                      *ngFor="let tag of clusterCard.cluster.tags"
+                      [text]="tag"
+                      status="basic"
+                      class="me-1"
+                    ></nb-badge>
+                  </div>
+                </div>
+
+                <div *ngIf="clusterCard.loading" class="text-center">
+                  <nb-spinner size="small" status="info"></nb-spinner>
+                </div>
+
+                <div *ngIf="!clusterCard.loading && clusterCard.health" class="mt-3">
+                  <small class="text-muted">健康检查:</small>
+                  <div *ngFor="let check of clusterCard.health.checks" class="mt-1">
+                    <small>{{ check.name }}: {{ check.message }}</small>
+                  </div>
+                </div>
+              </nb-card-body>
+              <nb-card-footer>
+                <div class="d-flex justify-content-between">
+                  <button nbButton size="small" status="info" (click)="navigateToCluster(clusterCard.cluster.id)">
+                    详情
+                  </button>
+                  <button nbButton size="small" status="primary" (click)="navigateToMonitor(clusterCard.cluster.id)">
+                    监控
+                  </button>
+                  <button nbButton size="small" status="success" (click)="navigateToBackends(clusterCard.cluster.id)">
+                    节点
+                  </button>
+                  <button nbButton size="small" status="warning" (click)="navigateToQueries(clusterCard.cluster.id)">
+                    查询
+                  </button>
+                </div>
+              </nb-card-footer>
+            </nb-card>
+          </div>
+        </div>
+      </nb-card-body>
+    </nb-card>
+  </div>
+</div>
+
