@@ -62,6 +62,18 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     jvm_heap_usage_pct REAL NOT NULL DEFAULT 0.0,       -- JVM heap usage (%)
     jvm_thread_count INTEGER NOT NULL DEFAULT 0,        -- JVM thread count
     
+    -- Network Metrics (BE)
+    network_bytes_sent_total BIGINT NOT NULL DEFAULT 0, -- Total bytes sent (cumulative)
+    network_bytes_received_total BIGINT NOT NULL DEFAULT 0, -- Total bytes received (cumulative)
+    network_send_rate REAL NOT NULL DEFAULT 0.0,        -- Network send rate (bytes/sec)
+    network_receive_rate REAL NOT NULL DEFAULT 0.0,     -- Network receive rate (bytes/sec)
+    
+    -- IO Metrics (BE)
+    io_read_bytes_total BIGINT NOT NULL DEFAULT 0,      -- Total bytes read (cumulative)
+    io_write_bytes_total BIGINT NOT NULL DEFAULT 0,     -- Total bytes written (cumulative)
+    io_read_rate REAL NOT NULL DEFAULT 0.0,             -- Disk read rate (bytes/sec)
+    io_write_rate REAL NOT NULL DEFAULT 0.0,            -- Disk write rate (bytes/sec)
+    
     -- Raw Metrics (JSON format for flexibility)
     raw_metrics TEXT,                                   -- JSON: additional metrics
     
