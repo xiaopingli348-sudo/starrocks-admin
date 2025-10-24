@@ -4,6 +4,7 @@ import { NbDialogService, NbToastrService } from '@nebular/theme';
 import { LocalDataSource } from 'ng2-smart-table';
 import { ClusterService, Cluster } from '../../../../@core/data/cluster.service';
 import { ErrorHandler } from '../../../../@core/utils/error-handler';
+import { ConfirmDialogService } from '../../../../@core/services/confirm-dialog.service';
 
 @Component({
   selector: 'ngx-cluster-list',
@@ -84,6 +85,7 @@ export class ClusterListComponent implements OnInit {
     private router: Router,
     private dialogService: NbDialogService,
     private toastrService: NbToastrService,
+    private confirmDialogService: ConfirmDialogService,
   ) {}
 
   ngOnInit(): void {
@@ -116,20 +118,23 @@ export class ClusterListComponent implements OnInit {
   }
 
   onDelete(event: any): void {
-    if (confirm(`确定要删除集群 "${event.data.name}" 吗？`)) {
-      this.clusterService.deleteCluster(event.data.id).subscribe({
-        next: () => {
-          this.toastrService.success('集群删除成功', '成功');
-          this.loadClusters();
-        },
-        error: (error) => {
-          this.toastrService.danger(
-            ErrorHandler.extractErrorMessage(error),
-            '错误',
-          );
-        },
+    this.confirmDialogService.confirmDelete(event.data.name)
+      .subscribe(confirmed => {
+        if (confirmed) {
+          this.clusterService.deleteCluster(event.data.id).subscribe({
+            next: () => {
+              this.toastrService.success('集群删除成功', '成功');
+              this.loadClusters();
+            },
+            error: (error) => {
+              this.toastrService.danger(
+                ErrorHandler.extractErrorMessage(error),
+                '错误',
+              );
+            },
+          });
+        }
       });
-    }
   }
 
   onRowSelect(event: any): void {

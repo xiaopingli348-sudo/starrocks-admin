@@ -37,6 +37,7 @@ import { SystemManagementComponent } from './system-management/system-management
 import { NestedLinkRenderComponent } from './system-management/nested-link-render.component';
 import { AddFunctionDialogComponent } from './system-management/add-function-dialog/add-function-dialog.component';
 import { EditFunctionDialogComponent } from './system-management/edit-function-dialog/edit-function-dialog.component';
+import { ConfirmDialogComponent } from '../../@core/components/confirm-dialog/confirm-dialog.component';
 
 @NgModule({
   declarations: [
@@ -54,6 +55,7 @@ import { EditFunctionDialogComponent } from './system-management/edit-function-d
     NestedLinkRenderComponent,
     AddFunctionDialogComponent,
     EditFunctionDialogComponent,
+    ConfirmDialogComponent,
   ],
   imports: [
     FormsModule,

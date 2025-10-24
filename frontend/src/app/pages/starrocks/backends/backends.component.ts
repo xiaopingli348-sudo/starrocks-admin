@@ -7,6 +7,7 @@ import { NodeService, Backend } from '../../../@core/data/node.service';
 import { ClusterService, Cluster } from '../../../@core/data/cluster.service';
 import { ClusterContextService } from '../../../@core/data/cluster-context.service';
 import { ErrorHandler } from '../../../@core/utils/error-handler';
+import { ConfirmDialogService } from '../../../@core/services/confirm-dialog.service';
 
 @Component({
   selector: 'ngx-backends',
@@ -109,24 +110,30 @@ export class BackendsComponent implements OnInit, OnDestroy {
 
   onDelete(event: any): void {
     const backend = event.data;
-    if (confirm(`确定要删除 Backend 节点 "${backend.IP}:${backend.HeartbeatPort}" 吗？\n\n⚠️ 警告: 删除节点是危险操作，请确保：\n1. 节点数据已迁移完成\n2. 集群有足够的副本数\n3. 该节点已停止服务`)) {
-      this.nodeService.deleteBackend(this.clusterId, backend.IP, backend.HeartbeatPort)
-        .subscribe({
-          next: () => {
-            this.toastrService.success(
-              `Backend 节点 ${backend.IP}:${backend.HeartbeatPort} 已删除`,
-              '成功'
-            );
-            this.loadBackends();
-          },
-          error: (error) => {
-            this.toastrService.danger(
-              ErrorHandler.extractErrorMessage(error),
-              '删除失败',
-            );
-          },
-        });
-    }
+    const itemName = `${backend.IP}:${backend.HeartbeatPort}`;
+    const additionalWarning = `⚠️ 警告: 删除节点是危险操作，请确保：\n1. 节点数据已迁移完成\n2. 集群有足够的副本数\n3. 该节点已停止服务`;
+    
+    this.confirmDialogService.confirmDelete(itemName, additionalWarning)
+      .subscribe(confirmed => {
+        if (confirmed) {
+          this.nodeService.deleteBackend(this.clusterId, backend.IP, backend.HeartbeatPort)
+            .subscribe({
+              next: () => {
+                this.toastrService.success(
+                  `Backend 节点 ${itemName} 已删除`,
+                  '成功'
+                );
+                this.loadBackends();
+              },
+              error: (error) => {
+                this.toastrService.danger(
+                  ErrorHandler.extractErrorMessage(error),
+                  '删除失败',
+                );
+              },
+            });
+        }
+      });
   }
 
   constructor(
@@ -134,6 +141,7 @@ export class BackendsComponent implements OnInit, OnDestroy {
     private clusterService: ClusterService,
     private clusterContext: ClusterContextService,
     private toastrService: NbToastrService,
+    private confirmDialogService: ConfirmDialogService,
   ) {
     // Get clusterId from ClusterContextService
     this.clusterId = this.clusterContext.getActiveClusterId() || 0;
