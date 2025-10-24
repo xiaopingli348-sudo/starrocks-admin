@@ -20,7 +20,7 @@ mod utils;
 
 use config::Config;
 use services::{
-    AuthService, ClusterService, MetricsCollectorService, MySQLPoolManager, 
+    AuthService, ClusterService, DataStatisticsService, MetricsCollectorService, MySQLPoolManager, 
     OverviewService, SystemFunctionService,
 };
 use sqlx::SqlitePool;
@@ -35,6 +35,7 @@ pub struct AppState {
     pub cluster_service: ClusterService,
     pub system_function_service: SystemFunctionService,
     pub metrics_collector_service: MetricsCollectorService,
+    pub data_statistics_service: DataStatisticsService,
     pub overview_service: OverviewService,
 }
 
@@ -79,6 +80,7 @@ pub struct AppState {
         handlers::overview::get_health_cards,
         handlers::overview::get_performance_trends,
         handlers::overview::get_resource_trends,
+        handlers::overview::get_data_statistics,
     ),
     components(
         schemas(
@@ -120,6 +122,9 @@ pub struct AppState {
             services::PerformanceTrends,
             services::ResourceTrends,
             services::MetricsSnapshot,
+            services::DataStatistics,
+            services::TopTableBySize,
+            services::TopTableByAccess,
         )
     ),
     tags(
@@ -202,10 +207,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pool.clone(),
         cluster_service.clone(),
     ));
-    let overview_service = Arc::new(OverviewService::new(
+    let data_statistics_service = Arc::new(DataStatisticsService::new(
         pool.clone(),
         cluster_service.clone(),
+        (*mysql_pool_manager).clone(),
     ));
+    let overview_service = Arc::new(
+        OverviewService::new(pool.clone(), cluster_service.clone())
+            .with_data_statistics(data_statistics_service.clone())
+    );
 
     let app_state = AppState {
         db: pool.clone(),
@@ -214,6 +224,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cluster_service: (*cluster_service).clone(),
         system_function_service: (*system_function_service).clone(),
         metrics_collector_service: (*metrics_collector_service).clone(),
+        data_statistics_service: (*data_statistics_service).clone(),
         overview_service: (*overview_service).clone(),
     };
     
@@ -260,6 +271,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/clusters/:id/overview/health", get(handlers::overview::get_health_cards))
         .route("/api/clusters/:id/overview/performance", get(handlers::overview::get_performance_trends))
         .route("/api/clusters/:id/overview/resources", get(handlers::overview::get_resource_trends))
+        .route("/api/clusters/:id/overview/data-stats", get(handlers::overview::get_data_statistics))
         .with_state(overview_service.clone());
 
     // Routes using AppState  

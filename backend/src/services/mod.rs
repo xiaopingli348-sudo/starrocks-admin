@@ -1,5 +1,6 @@
 pub mod auth_service;
 pub mod cluster_service;
+pub mod data_statistics_service;
 pub mod materialized_view_service;
 pub mod metrics_collector_service;
 pub mod mysql_client;
@@ -10,6 +11,7 @@ pub mod system_function_service;
 
 pub use auth_service::AuthService;
 pub use cluster_service::ClusterService;
+pub use data_statistics_service::{DataStatistics, DataStatisticsService, TopTableByAccess, TopTableBySize};
 pub use materialized_view_service::MaterializedViewService;
 pub use metrics_collector_service::{MetricsCollectorService, MetricsSnapshot};
 pub use mysql_client::MySQLClient;
