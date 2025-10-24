@@ -10,3 +10,6 @@ pub use starrocks::*;
 pub use system_function::*;
 pub use user::*;
 
+// Re-export newly added models
+pub use starrocks::{TableInfo, SchemaChange};
+

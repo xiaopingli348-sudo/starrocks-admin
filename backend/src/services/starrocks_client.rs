@@ -1,5 +1,6 @@
 use crate::models::{
-    Backend, Cluster, Frontend, MaterializedView, Query, RuntimeInfo,
+    Backend, Cluster, Database, Frontend, MaterializedView, Query, RuntimeInfo,
+    SchemaChange, Table, TableInfo,
 };
 use crate::utils::{ApiError, ApiResult};
 use reqwest::Client;
@@ -749,6 +750,154 @@ impl StarRocksClient {
         }
 
         Ok(Vec::new()) // Return empty if can't parse
+    }
+
+    // ========================================
+    // New methods for Cluster Overview
+    // ========================================
+
+    /// Get list of databases
+    pub async fn get_databases(&self) -> ApiResult<Vec<Database>> {
+        let url = format!("{}/api/show_proc?path=/dbs", self.get_base_url());
+        tracing::debug!("Fetching databases from: {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .basic_auth(&self.cluster.username, Some(&self.cluster.password_encrypted))
+            .send()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch databases: {}", e);
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            tracing::error!("Databases API returned error status: {}", response.status());
+            return Err(ApiError::cluster_connection_failed(format!(
+                "HTTP status: {}",
+                response.status()
+            )));
+        }
+
+        let data: Value = response.json().await.map_err(|e| {
+            tracing::error!("Failed to parse databases response: {}", e);
+            ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
+        })?;
+
+        let databases = Self::parse_proc_result::<Database>(&data)?;
+        tracing::debug!("Retrieved {} databases", databases.len());
+        Ok(databases)
+    }
+
+    /// Get list of tables in a database
+    pub async fn get_tables(&self, database: &str) -> ApiResult<Vec<Table>> {
+        let url = format!("{}/api/show_proc?path=/dbs/{}/tables", self.get_base_url(), urlencoding::encode(database));
+        tracing::debug!("Fetching tables from database '{}': {}", database, url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .basic_auth(&self.cluster.username, Some(&self.cluster.password_encrypted))
+            .send()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch tables: {}", e);
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            tracing::error!("Tables API returned error status: {}", response.status());
+            return Err(ApiError::cluster_connection_failed(format!(
+                "HTTP status: {}",
+                response.status()
+            )));
+        }
+
+        let data: Value = response.json().await.map_err(|e| {
+            tracing::error!("Failed to parse tables response: {}", e);
+            ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
+        })?;
+
+        let tables = Self::parse_proc_result::<Table>(&data)?;
+        tracing::debug!("Retrieved {} tables from database '{}'", tables.len(), database);
+        Ok(tables)
+    }
+
+    /// Get schema changes status
+    pub async fn get_schema_changes(&self) -> ApiResult<Vec<SchemaChange>> {
+        let url = format!("{}/api/show_proc?path=/jobs", self.get_base_url());
+        tracing::debug!("Fetching schema changes from: {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .basic_auth(&self.cluster.username, Some(&self.cluster.password_encrypted))
+            .send()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch schema changes: {}", e);
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            tracing::error!("Schema changes API returned error status: {}", response.status());
+            return Err(ApiError::cluster_connection_failed(format!(
+                "HTTP status: {}",
+                response.status()
+            )));
+        }
+
+        let data: Value = response.json().await.map_err(|e| {
+            tracing::error!("Failed to parse schema changes response: {}", e);
+            ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
+        })?;
+
+        let changes = Self::parse_proc_result::<SchemaChange>(&data)?;
+        tracing::debug!("Retrieved {} schema changes", changes.len());
+        Ok(changes)
+    }
+
+    /// Get active users from current queries
+    pub async fn get_active_users(&self) -> ApiResult<Vec<String>> {
+        let queries = self.get_queries().await?;
+        
+        // Extract unique users
+        let mut users: Vec<String> = queries
+            .iter()
+            .map(|q| q.user.clone())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        
+        users.sort();
+        tracing::debug!("Retrieved {} active users", users.len());
+        Ok(users)
+    }
+
+    /// Get database count
+    pub async fn get_database_count(&self) -> ApiResult<usize> {
+        let databases = self.get_databases().await?;
+        Ok(databases.len())
+    }
+
+    /// Get total table count across all databases
+    pub async fn get_total_table_count(&self) -> ApiResult<usize> {
+        let databases = self.get_databases().await?;
+        let mut total_tables = 0;
+        
+        for db in databases {
+            match self.get_tables(&db.database).await {
+                Ok(tables) => total_tables += tables.len(),
+                Err(e) => {
+                    tracing::warn!("Failed to get tables for database '{}': {}", db.database, e);
+                    // Continue with other databases
+                }
+            }
+        }
+        
+        tracing::debug!("Total table count: {}", total_tables);
+        Ok(total_tables)
     }
 }
 
