@@ -147,16 +147,15 @@ web_root = "web"
 - [Axum](https://github.com/tokio-rs/axum) - 强大的 Rust Web 框架
 - [StarRocks](https://www.starrocks.io/) - 高性能分析数据库
 
-## 📞 支持
-
-- 📧 **邮箱**: itjlon@gmail.com
-- 🐛 **问题反馈**: [GitHub Issues](https://github.com/your-org/starrocks-admin/issues)
-- 💬 **讨论**: [GitHub Discussions](https://github.com/your-org/starrocks-admin/discussions)
-- 📖 **文档**: [项目文档](https://docs.starrocks-admin.com)
-
----
+## 💝 捐赠支持
 
 <div align="center">
+
+![捐赠二维码](docs/images/wx.png)
+
+**您的捐赠将帮助我持续开源更新，非常感谢。**
+
+---
 
 **Made with ❤️ for StarRocks Community**
 
