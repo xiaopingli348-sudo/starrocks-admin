@@ -142,8 +142,8 @@ web_root = "web"
 
 ## 🙏 致谢
 
-- [ngx-admin](https://github.com/akveo/ngx-admin) - 优秀的 Angular 管理模板
-- [Nebular](https://akveo.github.io/nebular/) - 漂亮的 UI 组件库
+- [ngx-admin](https://github.com/John/ngx-admin) - 优秀的 Angular 管理模板
+- [Nebular](https://John.github.io/nebular/) - 漂亮的 UI 组件库
 - [Axum](https://github.com/tokio-rs/axum) - 强大的 Rust Web 框架
 - [StarRocks](https://www.starrocks.io/) - 高性能分析数据库
 

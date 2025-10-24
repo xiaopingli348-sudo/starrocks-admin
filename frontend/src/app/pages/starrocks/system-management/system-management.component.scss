@@ -82,14 +82,15 @@
 
 .category-card {
   transition: all 0.3s ease;
+  border-radius: 0.5rem;
   
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   }
   
   &.cdk-drag-preview {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     transform: rotate(2deg);
   }
   
@@ -101,29 +102,65 @@
     transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
   }
   
+  nb-card-header {
+    background-color: var(--background-basic-color-2);
+    border-bottom: 1px solid var(--border-basic-color-3);
+  }
+  
   .category-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-basic-color);
+    }
+    
+    nb-icon {
+      color: var(--text-hint-color);
+    }
+    
     .drag-handle {
       cursor: grab;
-      opacity: 0.6;
+      opacity: 0.4;
       transition: opacity 0.2s ease;
-  
-  &:hover {
-        opacity: 1;
+      color: var(--text-hint-color);
+      
+      &:hover {
+        opacity: 0.8;
       }
     }
   }
   
+  // 为每个分类添加左边框标识,而不是整个卡片背景色
+  &[data-category="集群信息"] nb-card-header {
+    border-left: 3px solid var(--color-info-500);
+  }
   
-  // basic 保持原样
-  &[status="basic"] {
-    nb-card-header {
-      background-color: var(--background-basic-color-2) !important;
-      border-left: 4px solid var(--border-basic-color-3);
-    }
+  &[data-category="数据库管理"] nb-card-header {
+    border-left: 3px solid var(--color-success-500);
+  }
+  
+  &[data-category="事务管理"] nb-card-header {
+    border-left: 3px solid var(--color-warning-500);
+  }
+  
+  &[data-category="任务管理"] nb-card-header {
+    border-left: 3px solid var(--color-primary-500);
+  }
+  
+  &[data-category="元数据管理"] nb-card-header {
+    border-left: 3px solid var(--border-basic-color-4);
+  }
+  
+  &[data-category="存储管理"] nb-card-header {
+    border-left: 3px solid var(--color-danger-500);
+  }
+  
+  &[data-category="作业管理"] nb-card-header {
+    border-left: 3px solid var(--color-control-default);
   }
 }
 
@@ -135,34 +172,39 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   margin-bottom: 0.5rem;
-  border: 1px solid var(--border-basic-color-3);
+  border: 1px solid var(--border-basic-color-2);
   border-radius: 0.375rem;
   background: var(--background-basic-color-1);
   cursor: pointer;
   transition: all 0.2s ease;
       
-      &:hover {
+  &:hover {
     background: var(--background-basic-color-2);
-    border-color: var(--color-primary-500);
-    transform: translateX(4px);
+    border-color: var(--border-basic-color-4);
+    transform: translateX(2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   }
   
   &.system-function {
     background: var(--background-basic-color-1);
-    border-left: 3px solid var(--color-success-500);
+    border-left: 2px solid var(--color-success-400);
+    
+    &:hover {
+      border-left-color: var(--color-success-500);
+    }
   }
   
   &.cdk-drag-preview {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     transform: rotate(1deg);
-    border: 1px solid var(--color-primary-500);
+    border: 1px solid var(--border-basic-color-4);
   }
   
   &.cdk-drag-placeholder {
-    opacity: 0.4;
-    background: var(--background-basic-color-3);
+    opacity: 0.3;
+    background: var(--background-basic-color-2);
   }
   
   &.cdk-drag-animating {

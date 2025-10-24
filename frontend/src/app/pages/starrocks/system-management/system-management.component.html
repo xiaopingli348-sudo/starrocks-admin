@@ -43,7 +43,6 @@
         *ngFor="let category of categories; let i = index" 
         cdkDrag
         class="category-card" 
-        [status]="getCategoryColor(category.name)"
         [attr.data-category]="category.name"
       >
         <nb-card-header>

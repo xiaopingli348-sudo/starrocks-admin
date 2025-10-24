@@ -101,3 +101,140 @@ Build at: 2025-10-24T03:20:23.411Z - Hash: 6fe885024e503056 - Time: 382ms
 Build at: 2025-10-24T03:21:55.511Z - Hash: 6fe885024e503056 - Time: 495ms
 
 ✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files                            | Names                      | Raw Size
+runtime.js                                     | runtime                    | 12.97 kB |
+
+Lazy Chunk Files                               | Names                      | Raw Size
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |  4.69 MB |
+
+6 unchanged chunks
+
+Build at: 2025-10-24T03:26:19.036Z - Hash: dd839cc5b2e13850 - Time: 784ms
+
+./src/app/pages/starrocks/system-management/system-management.component.scss?ngResource - Error: Module build failed (from ./node_modules/sass-loader/dist/cjs.js):
+SassError: unmatched "}".
+    ╷
+335 │ }
+    │ ^
+    ╵
+  src/app/pages/starrocks/system-management/system-management.component.scss 335:1  root stylesheet
+
+
+
+✖ Failed to compile.
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files                            | Names                      | Raw Size
+runtime.js                                     | runtime                    | 12.97 kB |
+
+Lazy Chunk Files                               | Names                      | Raw Size
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |  4.69 MB |
+
+6 unchanged chunks
+
+Build at: 2025-10-24T03:26:35.169Z - Hash: 6ebda285a4a371f1 - Time: 780ms
+
+./src/app/pages/starrocks/system-management/system-management.component.scss?ngResource - Error: Module build failed (from ./node_modules/sass-loader/dist/cjs.js):
+SassError: unmatched "}".
+    ╷
+335 │ }
+    │ ^
+    ╵
+  src/app/pages/starrocks/system-management/system-management.component.scss 335:1  root stylesheet
+
+
+
+✖ Failed to compile.
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files                            | Names                      | Raw Size
+runtime.js                                     | runtime                    | 12.97 kB |
+
+Lazy Chunk Files                               | Names                      | Raw Size
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |  4.69 MB |
+
+6 unchanged chunks
+
+Build at: 2025-10-24T03:26:52.674Z - Hash: 3b2b7f45c1784a88 - Time: 645ms
+
+./src/app/pages/starrocks/system-management/system-management.component.scss?ngResource - Error: Module build failed (from ./node_modules/sass-loader/dist/cjs.js):
+SassError: unmatched "}".
+    ╷
+340 │ }
+    │ ^
+    ╵
+  src/app/pages/starrocks/system-management/system-management.component.scss 340:1  root stylesheet
+
+
+
+✖ Failed to compile.
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files | Names   | Raw Size
+runtime.js          | runtime | 12.97 kB |
+
+7 unchanged chunks
+
+Build at: 2025-10-24T03:27:07.034Z - Hash: b205d447548fe377 - Time: 441ms
+
+./src/app/pages/starrocks/system-management/system-management.component.scss?ngResource - Error: Module build failed (from ./node_modules/sass-loader/dist/cjs.js):
+SassError: unmatched "}".
+    ╷
+344 │ }
+    │ ^
+    ╵
+  src/app/pages/starrocks/system-management/system-management.component.scss 344:1  root stylesheet
+
+
+
+✖ Failed to compile.
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files                            | Names                      | Raw Size
+runtime.js                                     | runtime                    | 12.97 kB |
+
+Lazy Chunk Files                               | Names                      | Raw Size
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |  4.71 MB |
+
+6 unchanged chunks
+
+Build at: 2025-10-24T03:28:13.163Z - Hash: 827d4f792a40a07c - Time: 828ms
+
+✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+8 unchanged chunks
+
+Build at: 2025-10-24T03:28:41.919Z - Hash: 827d4f792a40a07c - Time: 410ms
+
+✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+8 unchanged chunks
+
+Build at: 2025-10-24T03:28:49.228Z - Hash: 827d4f792a40a07c - Time: 347ms
+
+✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+8 unchanged chunks
+
+Build at: 2025-10-24T03:29:13.398Z - Hash: 827d4f792a40a07c - Time: 498ms
+
+✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files                            | Names                      | Raw Size
+main.js                                        | main                       |  2.64 MB |
+runtime.js                                     | runtime                    | 12.97 kB |
+
+Lazy Chunk Files                               | Names                      | Raw Size
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |  4.71 MB |
+
+5 unchanged chunks
+
+Build at: 2025-10-24T03:45:56.978Z - Hash: 748e0465143a8348 - Time: 3979ms
+
+✔ Compiled successfully.
