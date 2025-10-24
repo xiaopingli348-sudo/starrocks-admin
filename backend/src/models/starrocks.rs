@@ -222,6 +222,31 @@ pub struct Table {
     pub engine: Option<String>,
 }
 
+// Detailed table information (from information_schema.tables)
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+pub struct TableInfo {
+    pub table_schema: String,
+    pub table_name: String,
+    pub table_type: String,
+    pub engine: String,
+    pub table_rows: Option<i64>,
+    pub data_length: Option<i64>,
+    pub index_length: Option<i64>,
+    pub create_time: Option<String>,
+    pub update_time: Option<String>,
+}
+
+// Schema change information
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+pub struct SchemaChange {
+    pub job_id: String,
+    pub table_name: String,
+    pub create_time: String,
+    pub finish_time: Option<String>,
+    pub state: String,
+    pub msg: Option<String>,
+}
+
 // Metrics summary
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MetricsSummary {

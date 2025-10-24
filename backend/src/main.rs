@@ -19,7 +19,10 @@ mod services;
 mod utils;
 
 use config::Config;
-use services::{AuthService, ClusterService, MySQLPoolManager, SystemFunctionService};
+use services::{
+    AuthService, ClusterService, MetricsCollectorService, MySQLPoolManager, 
+    OverviewService, SystemFunctionService,
+};
 use sqlx::SqlitePool;
 use utils::JwtUtil;
 
@@ -31,6 +34,8 @@ pub struct AppState {
     pub auth_service: AuthService,
     pub cluster_service: ClusterService,
     pub system_function_service: SystemFunctionService,
+    pub metrics_collector_service: MetricsCollectorService,
+    pub overview_service: OverviewService,
 }
 
 #[derive(OpenApi)]
@@ -181,6 +186,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         (*mysql_pool_manager).clone(),
         (*cluster_service).clone(),
     ));
+    
+    // Create new services for cluster overview
+    let metrics_collector_service = Arc::new(MetricsCollectorService::new(
+        pool.clone(),
+        cluster_service.clone(),
+    ));
+    let overview_service = Arc::new(OverviewService::new(
+        pool.clone(),
+        cluster_service.clone(),
+    ));
 
     let app_state = AppState {
         db: pool.clone(),
@@ -188,7 +203,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth_service: (*auth_service).clone(),
         cluster_service: (*cluster_service).clone(),
         system_function_service: (*system_function_service).clone(),
+        metrics_collector_service: (*metrics_collector_service).clone(),
+        overview_service: (*overview_service).clone(),
     };
+    
+    // Start metrics collector background task
+    let collector_clone = metrics_collector_service.clone();
+    tokio::spawn(async move {
+        tracing::info!("Starting metrics collector background task");
+        collector_clone.start_collection().await;
+    });
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
