@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { NbDialogService } from '@nebular/theme';
 import { Observable } from 'rxjs';
-import { ConfirmDialogComponent, ConfirmDialogData } from '../components/confirm-dialog/confirm-dialog.component';
+import { ConfirmDialogComponent } from '../components/confirm-dialog/confirm-dialog.component';
 
 @Injectable({
   providedIn: 'root'
@@ -9,14 +9,25 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../components/confirm
 export class ConfirmDialogService {
   constructor(private dialogService: NbDialogService) {}
 
-  confirm(data: ConfirmDialogData): Observable<boolean> {
+  confirm(
+    title: string,
+    message: string,
+    confirmText: string = '确定',
+    cancelText: string = '取消',
+    confirmStatus: string = 'primary'
+  ): Observable<boolean> {
     return this.dialogService.open(ConfirmDialogComponent, {
-      context: { data },
+      context: {
+        title,
+        message,
+        confirmText,
+        cancelText,
+        confirmStatus
+      },
       hasBackdrop: true,
       closeOnBackdropClick: false,
       closeOnEsc: true,
-      autoFocus: true,
-      dialogClass: 'confirm-dialog'
+      autoFocus: true
     }).onClose;
   }
 
@@ -25,12 +36,12 @@ export class ConfirmDialogService {
       ? `确定要删除 "${itemName}" 吗？\n\n${additionalWarning}`
       : `确定要删除 "${itemName}" 吗？`;
 
-    return this.confirm({
-      title: '确认删除',
-      message: message,
-      confirmText: '删除',
-      cancelText: '取消',
-      type: 'danger'
-    });
+    return this.confirm(
+      '确认删除',
+      message,
+      '删除',
+      '取消',
+      'danger'
+    );
   }
 }

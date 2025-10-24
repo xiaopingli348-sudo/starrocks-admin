@@ -20,10 +20,10 @@ runtime.js                                     | runtime                    |  1
 | Initial Total              |  11.40 MB
 
 Lazy Chunk Files                               | Names                      |  Raw Size
-src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |   4.70 MB |
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |   4.71 MB |
 src_app_pages_pages_module_ts.js               | pages-pages-module         | 306.02 kB |
 
-Build at: 2025-10-23T09:15:31.864Z - Hash: 18c3c4b65d154c89 - Time: 4414ms
+Build at: 2025-10-24T03:15:19.332Z - Hash: f3a5e2a85d7bcda7 - Time: 3480ms
 
 Warning: /home/oppo/Documents/starrocks-admin/frontend/node_modules/@nebular/eva-icons/fesm2020/nebular-eva-icons.mjs depends on 'eva-icons'. CommonJS or AMD dependencies can cause optimization bailouts.
 For more info see: https://angular.io/guide/build#configuring-commonjs-dependencies
@@ -36,12 +36,68 @@ For more info see: https://angular.io/guide/build#configuring-commonjs-dependenc
 ✔ Compiled successfully.
 ✔ Browser application bundle generation complete.
 
-Initial Chunk Files | Names   | Raw Size
-main.js             | main    |  2.64 MB |
-runtime.js          | runtime | 12.97 kB |
+Initial Chunk Files                            | Names                      | Raw Size
+runtime.js                                     | runtime                    | 12.97 kB |
+
+Lazy Chunk Files                               | Names                      | Raw Size
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |  4.71 MB |
 
 6 unchanged chunks
 
-Build at: 2025-10-23T10:21:42.353Z - Hash: 0a001a0c74d28a03 - Time: 2312ms
+Build at: 2025-10-24T03:18:50.794Z - Hash: 75d6450dcadd1a06 - Time: 2708ms
+
+Error: src/app/@core/services/confirm-dialog.service.ts:4:34 - error TS2305: Module '"../components/confirm-dialog/confirm-dialog.component"' has no exported member 'ConfirmDialogData'.
+
+4 import { ConfirmDialogComponent, ConfirmDialogData } from '../components/confirm-dialog/confirm-dialog.component';
+                                   ~~~~~~~~~~~~~~~~~
+
+
+Error: src/app/@core/services/confirm-dialog.service.ts:14:18 - error TS2322: Type '{ data: ConfirmDialogData; }' is not assignable to type 'string | Partial<ConfirmDialogComponent>'.
+  Object literal may only specify known properties, and 'data' does not exist in type 'Partial<ConfirmDialogComponent>'.
+
+14       context: { data },
+                    ~~~~
+
+  node_modules/@nebular/theme/components/dialog/dialog-config.d.ts:47:5
+    47     context: D;
+           ~~~~~~~
+    The expected type comes from property 'context' which is declared here on type 'Partial<NbDialogConfig<string | Partial<ConfirmDialogComponent>>>'
+
+
+
+
+✖ Failed to compile.
+✔ Browser application bundle generation complete.
+
+Initial Chunk Files                            | Names                      | Raw Size
+runtime.js                                     | runtime                    | 12.97 kB |
+
+Lazy Chunk Files                               | Names                      | Raw Size
+src_app_pages_starrocks_starrocks_module_ts.js | starrocks-starrocks-module |  4.71 MB |
+
+6 unchanged chunks
+
+Build at: 2025-10-24T03:19:08.036Z - Hash: 6fe885024e503056 - Time: 1802ms
+
+✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+8 unchanged chunks
+
+Build at: 2025-10-24T03:20:03.260Z - Hash: 6fe885024e503056 - Time: 846ms
+
+✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+8 unchanged chunks
+
+Build at: 2025-10-24T03:20:23.411Z - Hash: 6fe885024e503056 - Time: 382ms
+
+✔ Compiled successfully.
+✔ Browser application bundle generation complete.
+
+8 unchanged chunks
+
+Build at: 2025-10-24T03:21:55.511Z - Hash: 6fe885024e503056 - Time: 495ms
 
 ✔ Compiled successfully.
