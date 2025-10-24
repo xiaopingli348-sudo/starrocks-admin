@@ -23,6 +23,7 @@ use services::{
     AuthService, ClusterService, DataStatisticsService, MetricsCollectorService, MySQLPoolManager, 
     OverviewService, SystemFunctionService,
 };
+use utils::ScheduledExecutor;
 use sqlx::SqlitePool;
 use utils::JwtUtil;
 
@@ -228,12 +229,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         overview_service: (*overview_service).clone(),
     };
     
-    // Start metrics collector background task
-    let collector_clone = metrics_collector_service.clone();
-    tokio::spawn(async move {
-        tracing::info!("Starting metrics collector background task");
-        collector_clone.start_collection().await;
-    });
+    // Start metrics collector using ScheduledExecutor (30 seconds interval)
+    let executor = ScheduledExecutor::new(
+        "metrics-collector",
+        std::time::Duration::from_secs(30),
+    );
+    executor.spawn((*metrics_collector_service).clone());
 
     let cors = CorsLayer::new()
         .allow_origin(Any)

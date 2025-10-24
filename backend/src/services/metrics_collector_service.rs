@@ -4,12 +4,13 @@
 
 use crate::models::{Cluster, MetricsSummary};
 use crate::services::{ClusterService, StarRocksClient};
-use crate::utils::ApiResult;
+use crate::utils::{ApiResult, ScheduledTask};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
-use tokio::time::{interval, Duration};
 
 /// Metrics snapshot stored in database
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -79,7 +80,6 @@ pub struct MetricsSnapshot {
 pub struct MetricsCollectorService {
     db: SqlitePool,
     cluster_service: Arc<ClusterService>,
-    collection_interval: Duration,
     retention_days: i64,
 }
 
@@ -89,44 +89,42 @@ impl MetricsCollectorService {
         Self {
             db,
             cluster_service,
-            collection_interval: Duration::from_secs(30), // 30 seconds
-            retention_days: 7,                             // 7 days retention
+            retention_days: 7, // 7 days retention
         }
     }
 
-    /// Start the background collection task
-    /// This should be called once when the application starts
-    pub async fn start_collection(self: Arc<Self>) {
-        let mut ticker = interval(self.collection_interval);
+    /// Execute one collection cycle
+    /// This is called periodically by the ScheduledExecutor
+    pub async fn collect_once(&self) -> Result<(), anyhow::Error> {
+        // Collect metrics from all clusters
+        self.collect_all_clusters().await?;
         
-        tracing::info!(
-            "Starting metrics collector (interval: {}s, retention: {} days)",
-            self.collection_interval.as_secs(),
-            self.retention_days
-        );
+        // Check if we need to run daily aggregation
+        self.check_and_run_daily_aggregation().await?;
         
-        // Track last daily aggregation date
-        let mut last_daily_aggregation = Utc::now().date_naive();
+        Ok(())
+    }
+
+    /// Check if daily aggregation is needed and run it
+    async fn check_and_run_daily_aggregation(&self) -> Result<(), anyhow::Error> {
+        // Check if we've already aggregated today
+        let today = Utc::now().date_naive();
+        let yesterday = today - chrono::Duration::days(1);
         
-        loop {
-            ticker.tick().await;
-            
-            // Collect metrics
-            if let Err(e) = self.collect_all_clusters().await {
-                tracing::error!("Failed to collect metrics: {}", e);
-            }
-            
-            // Check if we need to run daily aggregation (once per day at midnight)
-            let current_date = Utc::now().date_naive();
-            if current_date > last_daily_aggregation {
-                tracing::info!("Running daily aggregation for date: {}", last_daily_aggregation);
-                if let Err(e) = self.run_daily_aggregation_all_clusters().await {
-                    tracing::error!("Failed to run daily aggregation: {}", e);
-                } else {
-                    last_daily_aggregation = current_date;
-                }
-            }
+        // Check if yesterday's data has been aggregated
+        let exists = sqlx::query!(
+            "SELECT COUNT(*) as count FROM daily_snapshots WHERE snapshot_date = ?",
+            yesterday
+        )
+        .fetch_one(&self.db)
+        .await?;
+        
+        if exists.count == 0 {
+            tracing::info!("Running daily aggregation for date: {}", yesterday);
+            self.run_daily_aggregation_all_clusters().await?;
         }
+        
+        Ok(())
     }
 
     /// Collect metrics from all clusters
@@ -474,6 +472,14 @@ impl MetricsCollectorService {
                 jvm_heap_used: r.jvm_heap_used,
                 jvm_heap_usage_pct: r.jvm_heap_usage_pct,
                 jvm_thread_count: r.jvm_thread_count,
+                network_bytes_sent_total: r.network_bytes_sent_total,
+                network_bytes_received_total: r.network_bytes_received_total,
+                network_send_rate: r.network_send_rate,
+                network_receive_rate: r.network_receive_rate,
+                io_read_bytes_total: r.io_read_bytes_total,
+                io_write_bytes_total: r.io_write_bytes_total,
+                io_read_rate: r.io_read_rate,
+                io_write_rate: r.io_write_rate,
             }))
         } else {
             Ok(None)
@@ -663,6 +669,17 @@ impl MetricsCollectorService {
         }
         
         Ok(())
+    }
+}
+
+// Implement ScheduledTask for MetricsCollectorService
+impl ScheduledTask for MetricsCollectorService {
+    fn run(&self) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send + '_>> {
+        Box::pin(async move { self.collect_once().await })
+    }
+
+    fn name(&self) -> &str {
+        "metrics-collector"
     }
 }
 
