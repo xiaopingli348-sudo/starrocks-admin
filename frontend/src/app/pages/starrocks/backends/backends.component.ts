@@ -26,7 +26,17 @@ export class BackendsComponent implements OnInit, OnDestroy {
     mode: 'external',
     hideSubHeader: false, // Enable search
     noDataMessage: '暂无Backend节点数据',
-    actions: false,
+    actions: {
+      columnTitle: '操作',
+      add: false,
+      edit: false,
+      delete: true,
+      position: 'right',
+    },
+    delete: {
+      deleteButtonContent: '<i class="nb-trash"></i>',
+      confirmDelete: true,
+    },
     pager: {
       display: true,
       perPage: 15,
@@ -96,6 +106,28 @@ export class BackendsComponent implements OnInit, OnDestroy {
       },
     },
   };
+
+  onDelete(event: any): void {
+    const backend = event.data;
+    if (confirm(`确定要删除 Backend 节点 "${backend.IP}:${backend.HeartbeatPort}" 吗？\n\n⚠️ 警告: 删除节点是危险操作，请确保：\n1. 节点数据已迁移完成\n2. 集群有足够的副本数\n3. 该节点已停止服务`)) {
+      this.nodeService.deleteBackend(this.clusterId, backend.IP, backend.HeartbeatPort)
+        .subscribe({
+          next: () => {
+            this.toastrService.success(
+              `Backend 节点 ${backend.IP}:${backend.HeartbeatPort} 已删除`,
+              '成功'
+            );
+            this.loadBackends();
+          },
+          error: (error) => {
+            this.toastrService.danger(
+              ErrorHandler.extractErrorMessage(error),
+              '删除失败',
+            );
+          },
+        });
+    }
+  }
 
   constructor(
     private nodeService: NodeService,

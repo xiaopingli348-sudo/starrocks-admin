@@ -157,6 +157,10 @@ export class NodeService {
     return this.api.get<Backend[]>(`/clusters/${clusterId}/backends`);
   }
 
+  deleteBackend(clusterId: number, host: string, port: string): Observable<any> {
+    return this.api.delete<any>(`/clusters/${clusterId}/backends/${host}/${port}`);
+  }
+
   listFrontends(clusterId: number): Observable<Frontend[]> {
     return this.api.get<Frontend[]>(`/clusters/${clusterId}/frontends`);
   }

@@ -78,6 +78,47 @@ impl StarRocksClient {
         Ok(backends)
     }
 
+    // Execute SQL command via HTTP API
+    pub async fn execute_sql(&self, sql: &str) -> ApiResult<()> {
+        let url = format!("{}/api/query", self.get_base_url());
+        tracing::debug!("Executing SQL: {}", sql);
+
+        let body = serde_json::json!({
+            "query": sql
+        });
+
+        let response = self
+            .http_client
+            .post(&url)
+            .basic_auth(&self.cluster.username, Some(&self.cluster.password_encrypted))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to execute SQL: {}", e);
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            tracing::error!("SQL execution failed with status {}: {}", status, error_text);
+            return Err(ApiError::cluster_connection_failed(
+                format!("SQL execution failed: {}", error_text)
+            ));
+        }
+
+        tracing::info!("SQL executed successfully: {}", sql);
+        Ok(())
+    }
+
+    // Drop backend node
+    pub async fn drop_backend(&self, host: &str, heartbeat_port: &str) -> ApiResult<()> {
+        let sql = format!("ALTER SYSTEM DROP backend \"{}:{}\"", host, heartbeat_port);
+        tracing::info!("Dropping backend: {}:{}", host, heartbeat_port);
+        self.execute_sql(&sql).await
+    }
+
     // Get frontends via HTTP API
     pub async fn get_frontends(&self) -> ApiResult<Vec<Frontend>> {
         let url = format!("{}/api/show_proc?path=/frontends", self.get_base_url());

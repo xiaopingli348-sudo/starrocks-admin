@@ -199,6 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/clusters/:id", put(handlers::cluster::update_cluster))
         .route("/api/clusters/:id", delete(handlers::cluster::delete_cluster))
         .route("/api/clusters/:id/backends", get(handlers::backend::list_backends))
+        .route("/api/clusters/:id/backends/:host/:port", delete(handlers::backend::delete_backend))
         .route("/api/clusters/:id/frontends", get(handlers::frontend::list_frontends))
         .route("/api/clusters/:id/queries", get(handlers::query::list_queries))
         .route("/api/clusters/:id/system/runtime_info", get(handlers::system::get_runtime_info))

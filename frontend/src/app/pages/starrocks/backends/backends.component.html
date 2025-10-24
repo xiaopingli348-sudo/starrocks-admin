@@ -30,6 +30,7 @@
           *ngIf="!loading"
           [settings]="settings"
           [source]="source"
+          (delete)="onDelete($event)"
         >
         </ng2-smart-table>
       </nb-card-body>

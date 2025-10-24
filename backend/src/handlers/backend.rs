@@ -33,3 +33,37 @@ pub async fn list_backends(
     Ok(Json(backends))
 }
 
+// Delete a backend node
+#[utoipa::path(
+    delete,
+    path = "/api/clusters/{id}/backends/{host}/{port}",
+    params(
+        ("id" = i64, Path, description = "Cluster ID"),
+        ("host" = String, Path, description = "Backend host"),
+        ("port" = String, Path, description = "Backend heartbeat port")
+    ),
+    responses(
+        (status = 200, description = "Backend deleted successfully"),
+        (status = 404, description = "Cluster not found"),
+        (status = 500, description = "Failed to delete backend")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Backends"
+)]
+pub async fn delete_backend(
+    State(cluster_service): State<ClusterServiceState>,
+    Path((cluster_id, host, port)): Path<(i64, String, String)>,
+) -> ApiResult<Json<serde_json::Value>> {
+    tracing::info!("Deleting backend {}:{} from cluster {}", host, port, cluster_id);
+    
+    let cluster = cluster_service.get_cluster(cluster_id).await?;
+    let client = StarRocksClient::new(cluster);
+    client.drop_backend(&host, &port).await?;
+    
+    Ok(Json(serde_json::json!({
+        "message": format!("Backend {}:{} deleted successfully", host, port)
+    })))
+}
+
