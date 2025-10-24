@@ -77,7 +77,7 @@ else
 fi
 
 # Create enhanced start script for backend
-cat > "$DIST_DIR/bin/start-backend.sh" << 'EOF'
+cat > "$DIST_DIR/bin/starrocks-admin.sh" << 'EOF'
 #!/bin/bash
 
 # StarRocks Admin Backend - 生产环境管理脚本
@@ -325,10 +325,10 @@ main() {
 main "$@"
 EOF
 
-chmod +x "$DIST_DIR/bin/start-backend.sh"
+chmod +x "$DIST_DIR/bin/starrocks-admin.sh"
 
 echo ""
 echo -e "${GREEN}✓ Backend build complete!${NC}"
 echo -e "  Binary: $DIST_DIR/bin/starrocks-admin"
-echo -e "  Startup script: $DIST_DIR/bin/start-backend.sh"
+echo -e "  Startup script: $DIST_DIR/bin/starrocks-admin.sh"
 echo -e "  Config file: $DIST_DIR/conf/config.toml"
