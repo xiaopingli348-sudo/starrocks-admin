@@ -75,6 +75,10 @@ pub struct AppState {
         handlers::system_management::get_system_function_detail,
         handlers::system::get_runtime_info,
         handlers::monitor::get_metrics_summary,
+        handlers::overview::get_cluster_overview,
+        handlers::overview::get_health_cards,
+        handlers::overview::get_performance_trends,
+        handlers::overview::get_resource_trends,
     ),
     components(
         schemas(
@@ -110,6 +114,12 @@ pub struct AppState {
             models::CreateFunctionRequest,
             models::UpdateOrderRequest,
             models::FunctionOrder,
+            services::ClusterOverview,
+            services::HealthCard,
+            services::HealthStatus,
+            services::PerformanceTrends,
+            services::ResourceTrends,
+            services::MetricsSnapshot,
         )
     ),
     tags(
@@ -243,6 +253,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/clusters/:id/system/runtime_info", get(handlers::system::get_runtime_info))
         .route("/api/clusters/:id/metrics/summary", get(handlers::monitor::get_metrics_summary))
         .with_state(cluster_service.clone());
+    
+    // Routes using OverviewService
+    let overview_routes = Router::new()
+        .route("/api/clusters/:id/overview", get(handlers::overview::get_cluster_overview))
+        .route("/api/clusters/:id/overview/health", get(handlers::overview::get_health_cards))
+        .route("/api/clusters/:id/overview/performance", get(handlers::overview::get_performance_trends))
+        .route("/api/clusters/:id/overview/resources", get(handlers::overview::get_resource_trends))
+        .with_state(overview_service.clone());
 
     // Routes using AppState  
     let app_state_arc = Arc::new(app_state.clone());
@@ -283,6 +301,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let protected_routes = Router::new()
         .merge(auth_routes)
         .merge(cluster_routes)
+        .merge(overview_routes)
         .merge(app_routes)
         .layer(axum_middleware::from_fn_with_state(
             auth_state,
