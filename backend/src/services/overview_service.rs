@@ -3,7 +3,7 @@
 // Design Ref: ARCHITECTURE_ANALYSIS_AND_INTEGRATION.md
 
 use crate::models::Cluster;
-use crate::services::{ClusterService, MetricsSnapshot};
+use crate::services::{ClusterService, DataStatistics, DataStatisticsService, MetricsSnapshot};
 use crate::utils::{ApiError, ApiResult, ErrorCode};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -117,6 +117,7 @@ pub enum HealthStatus {
 pub struct OverviewService {
     db: SqlitePool,
     cluster_service: Arc<ClusterService>,
+    data_statistics_service: Option<Arc<DataStatisticsService>>,
 }
 
 impl OverviewService {
@@ -125,7 +126,14 @@ impl OverviewService {
         Self {
             db,
             cluster_service,
+            data_statistics_service: None,
         }
+    }
+
+    /// Set data statistics service (optional dependency)
+    pub fn with_data_statistics(mut self, service: Arc<DataStatisticsService>) -> Self {
+        self.data_statistics_service = Some(service);
+        self
     }
 
     /// Get cluster overview (main API)
@@ -267,6 +275,30 @@ impl OverviewService {
     ) -> ApiResult<ResourceTrends> {
         let history = self.get_history_snapshots(cluster_id, &time_range).await?;
         Ok(self.calculate_resource_trends(&history))
+    }
+
+    /// Get data statistics (database/table counts, top tables, etc.)
+    pub async fn get_data_statistics(&self, cluster_id: i64) -> ApiResult<DataStatistics> {
+        if let Some(ref service) = self.data_statistics_service {
+            // Try to get cached statistics first
+            if let Some(stats) = service.get_statistics(cluster_id).await? {
+                // Check if cache is recent (< 10 minutes old)
+                let age = Utc::now() - stats.updated_at;
+                if age.num_minutes() < 10 {
+                    tracing::debug!("Using cached data statistics (age: {} minutes)", age.num_minutes());
+                    return Ok(stats);
+                }
+            }
+            
+            // Cache is stale or doesn't exist, update it
+            tracing::debug!("Updating data statistics for cluster {}", cluster_id);
+            service.update_statistics(cluster_id).await
+        } else {
+            Err(ApiError::new(
+                ErrorCode::InternalError,
+                "Data statistics service not configured"
+            ))
+        }
     }
 
     // ========================================

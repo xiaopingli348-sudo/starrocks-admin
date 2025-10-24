@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::services::{
-    ClusterOverview, HealthCard, OverviewService, PerformanceTrends, ResourceTrends, TimeRange,
+    ClusterOverview, DataStatistics, HealthCard, OverviewService, PerformanceTrends, ResourceTrends, TimeRange,
 };
 use crate::utils::ApiResult;
 
@@ -194,5 +194,41 @@ pub async fn get_resource_trends(
         .await?;
 
     Ok(Json(trends))
+}
+
+/// Get data statistics
+/// 
+/// Returns cached data statistics including:
+/// - Database and table counts
+/// - Top 20 tables by size
+/// - Top 20 tables by access count
+/// - Materialized view statistics
+/// - Schema change statistics
+/// - Active users
+#[utoipa::path(
+    get,
+    path = "/api/clusters/{id}/overview/data-stats",
+    params(
+        ("id" = i64, Path, description = "Cluster ID")
+    ),
+    responses(
+        (status = 200, description = "Data statistics", body = DataStatistics),
+        (status = 404, description = "Cluster not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Cluster Overview"
+)]
+pub async fn get_data_statistics(
+    State(overview_service): State<OverviewServiceState>,
+    Path(cluster_id): Path<i64>,
+) -> ApiResult<Json<DataStatistics>> {
+    tracing::debug!("GET /api/clusters/{}/overview/data-stats", cluster_id);
+
+    let stats = overview_service.get_data_statistics(cluster_id).await?;
+
+    Ok(Json(stats))
 }
 
