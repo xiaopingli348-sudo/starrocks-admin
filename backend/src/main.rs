@@ -47,6 +47,14 @@ pub struct AppState {
         handlers::cluster::get_cluster_health,
         handlers::backend::list_backends,
         handlers::frontend::list_frontends,
+        handlers::materialized_view::list_materialized_views,
+        handlers::materialized_view::get_materialized_view,
+        handlers::materialized_view::get_materialized_view_ddl,
+        handlers::materialized_view::create_materialized_view,
+        handlers::materialized_view::delete_materialized_view,
+        handlers::materialized_view::refresh_materialized_view,
+        handlers::materialized_view::cancel_refresh_materialized_view,
+        handlers::materialized_view::alter_materialized_view,
         handlers::query::list_queries,
         handlers::query::kill_query,
         handlers::query::execute_sql,
@@ -79,6 +87,11 @@ pub struct AppState {
             models::HealthCheck,
             models::Backend,
             models::Frontend,
+            models::MaterializedView,
+            models::CreateMaterializedViewRequest,
+            models::RefreshMaterializedViewRequest,
+            models::AlterMaterializedViewRequest,
+            models::MaterializedViewDDL,
             models::Query,
             models::QueryExecuteRequest,
             models::QueryExecuteResponse,
@@ -99,6 +112,7 @@ pub struct AppState {
         (name = "Clusters", description = "Cluster management endpoints"),
         (name = "Backends", description = "Backend node management"),
         (name = "Frontends", description = "Frontend node management"),
+        (name = "Materialized Views", description = "Materialized view management"),
         (name = "Queries", description = "Query management"),
         (name = "Profiles", description = "Query profile management"),
         (name = "System", description = "System information"),
@@ -210,6 +224,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state_arc = Arc::new(app_state.clone());
     let app_routes = Router::new()
         .route("/api/clusters/:id/health", get(handlers::cluster::get_cluster_health).post(handlers::cluster::get_cluster_health))
+        .route("/api/clusters/:id/materialized_views", get(handlers::materialized_view::list_materialized_views).post(handlers::materialized_view::create_materialized_view))
+        .route("/api/clusters/:id/materialized_views/:mv_name", get(handlers::materialized_view::get_materialized_view).delete(handlers::materialized_view::delete_materialized_view).put(handlers::materialized_view::alter_materialized_view))
+        .route("/api/clusters/:id/materialized_views/:mv_name/ddl", get(handlers::materialized_view::get_materialized_view_ddl))
+        .route("/api/clusters/:id/materialized_views/:mv_name/refresh", post(handlers::materialized_view::refresh_materialized_view))
+        .route("/api/clusters/:id/materialized_views/:mv_name/cancel", post(handlers::materialized_view::cancel_refresh_materialized_view))
         .route("/api/clusters/:cluster_id/queries/execute", post(handlers::query::execute_sql))
         .route("/api/clusters/:cluster_id/queries/:query_id", delete(handlers::query::kill_query))
         .route("/api/clusters/:cluster_id/queries/history", get(handlers::query_history::list_query_history))

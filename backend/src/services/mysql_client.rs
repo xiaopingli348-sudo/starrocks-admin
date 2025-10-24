@@ -2,6 +2,7 @@ use crate::utils::error::ApiError;
 use mysql_async::{Pool, prelude::Queryable};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct MySQLClient {
     pool: Arc<Pool>,
 }
@@ -13,7 +14,8 @@ impl MySQLClient {
         }
     }
 
-    pub async fn query(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<String>>), ApiError> {
+    /// Execute a query and return results as (column_names, rows)
+    pub async fn query_raw(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<String>>), ApiError> {
         tracing::debug!("Getting MySQL connection from pool...");
         let mut conn = self.pool.get_conn().await
             .map_err(|e| {
@@ -70,6 +72,25 @@ impl MySQLClient {
         Ok((columns, result_rows))
     }
 
+    /// Execute a query and return results as Vec<serde_json::Value> (JSON objects)
+    /// Each row is a JSON object with column names as keys
+    pub async fn query(&self, sql: &str) -> Result<Vec<serde_json::Value>, ApiError> {
+        let (column_names, rows) = self.query_raw(sql).await?;
+        
+        let mut result = Vec::new();
+        for row in rows {
+            let mut obj = serde_json::Map::new();
+            for (i, col_name) in column_names.iter().enumerate() {
+                if let Some(value) = row.get(i) {
+                    obj.insert(col_name.clone(), serde_json::Value::String(value.clone()));
+                }
+            }
+            result.push(serde_json::Value::Object(obj));
+        }
+        
+        Ok(result)
+    }
+
     pub async fn execute(&self, sql: &str) -> Result<u64, ApiError> {
         tracing::debug!("Executing MySQL statement: '{}'", sql);
         
@@ -92,6 +113,7 @@ impl MySQLClient {
         
         Ok(result.len() as u64)
     }
+
 }
 
 // Convert mysql_async::Value directly to String without using FromValue trait

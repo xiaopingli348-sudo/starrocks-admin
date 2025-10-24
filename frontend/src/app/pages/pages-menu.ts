@@ -32,7 +32,12 @@ export const MENU_ITEMS: NbMenuItem[] = [
     link: '/pages/starrocks/queries',
   },
   {
-    title: '系统管理',
+    title: '物化视图',
+    icon: 'cube-outline',
+    link: '/pages/starrocks/materialized-views',
+  },
+  {
+    title: '功能卡片',
     icon: 'grid-outline',
     link: '/pages/starrocks/system',
   },
@@ -50,13 +55,5 @@ export const MENU_ITEMS: NbMenuItem[] = [
     title: '监控指标',
     icon: 'activity-outline',
     link: '/pages/starrocks/monitor',
-  },
-  {
-    title: '用户设置',
-    group: true,
-  },
-  {
-    title: '退出登录',
-    icon: 'log-out-outline',
   },
 ];

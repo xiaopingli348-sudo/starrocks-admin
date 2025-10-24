@@ -122,7 +122,7 @@ pub async fn execute_sql(
 
     // Execute query with detailed error handling
     tracing::info!("🚀 Executing SQL query...");
-    let query_result = mysql_client.query(&sql).await;
+    let query_result = mysql_client.query_raw(&sql).await;
     
     let execution_time_ms = start.elapsed().as_millis();
     

@@ -29,6 +29,7 @@ import { ClusterFormComponent } from './clusters/cluster-form/cluster-form.compo
 import { ClusterDetailComponent } from './clusters/cluster-detail/cluster-detail.component';
 import { BackendsComponent } from './backends/backends.component';
 import { FrontendsComponent } from './frontends/frontends.component';
+import { MaterializedViewsComponent } from './materialized-views/materialized-views.component';
 import { QueriesComponent } from './queries/queries.component';
 import { MonitorComponent } from './monitor/monitor.component';
 import { SessionsComponent } from './sessions/sessions.component';
@@ -38,6 +39,7 @@ import { NestedLinkRenderComponent } from './system-management/nested-link-rende
 import { AddFunctionDialogComponent } from './system-management/add-function-dialog/add-function-dialog.component';
 import { EditFunctionDialogComponent } from './system-management/edit-function-dialog/edit-function-dialog.component';
 import { ConfirmDialogComponent } from '../../@core/components/confirm-dialog/confirm-dialog.component';
+import { ActiveToggleRenderComponent } from './materialized-views/active-toggle-render.component';
 
 @NgModule({
   declarations: [
@@ -47,6 +49,8 @@ import { ConfirmDialogComponent } from '../../@core/components/confirm-dialog/co
     ClusterDetailComponent,
     BackendsComponent,
     FrontendsComponent,
+    MaterializedViewsComponent,
+    ActiveToggleRenderComponent,
     QueriesComponent,
     MonitorComponent,
     SessionsComponent,

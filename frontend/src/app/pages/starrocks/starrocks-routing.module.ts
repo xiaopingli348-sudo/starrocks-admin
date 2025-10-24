@@ -6,6 +6,7 @@ import { ClusterFormComponent } from './clusters/cluster-form/cluster-form.compo
 import { ClusterDetailComponent } from './clusters/cluster-detail/cluster-detail.component';
 import { BackendsComponent } from './backends/backends.component';
 import { FrontendsComponent } from './frontends/frontends.component';
+import { MaterializedViewsComponent } from './materialized-views/materialized-views.component';
 import { QueriesComponent } from './queries/queries.component';
 import { MonitorComponent } from './monitor/monitor.component';
 import { SessionsComponent } from './sessions/sessions.component';
@@ -50,6 +51,10 @@ const routes: Routes = [
   {
     path: 'frontends',
     component: FrontendsComponent,
+  },
+  {
+    path: 'materialized-views',
+    component: MaterializedViewsComponent,
   },
   {
     path: 'queries',
