@@ -61,6 +61,18 @@ pub struct MetricsSnapshot {
     pub jvm_heap_used: i64,
     pub jvm_heap_usage_pct: f64,
     pub jvm_thread_count: i32,
+    
+    // Network metrics
+    pub network_bytes_sent_total: i64,
+    pub network_bytes_received_total: i64,
+    pub network_send_rate: f64,
+    pub network_receive_rate: f64,
+    
+    // IO metrics
+    pub io_read_bytes_total: i64,
+    pub io_write_bytes_total: i64,
+    pub io_read_rate: f64,
+    pub io_write_rate: f64,
 }
 
 #[derive(Clone)]
@@ -93,11 +105,26 @@ impl MetricsCollectorService {
             self.retention_days
         );
         
+        // Track last daily aggregation date
+        let mut last_daily_aggregation = Utc::now().date_naive();
+        
         loop {
             ticker.tick().await;
             
+            // Collect metrics
             if let Err(e) = self.collect_all_clusters().await {
                 tracing::error!("Failed to collect metrics: {}", e);
+            }
+            
+            // Check if we need to run daily aggregation (once per day at midnight)
+            let current_date = Utc::now().date_naive();
+            if current_date > last_daily_aggregation {
+                tracing::info!("Running daily aggregation for date: {}", last_daily_aggregation);
+                if let Err(e) = self.run_daily_aggregation_all_clusters().await {
+                    tracing::error!("Failed to run daily aggregation: {}", e);
+                } else {
+                    last_daily_aggregation = current_date;
+                }
             }
         }
     }
@@ -203,6 +230,18 @@ impl MetricsCollectorService {
             0.0
         };
         
+        // Network metrics (BE)
+        let network_bytes_sent_total = metrics_map.get("starrocks_be_network_send_bytes").copied().unwrap_or(0.0) as i64;
+        let network_bytes_received_total = metrics_map.get("starrocks_be_network_receive_bytes").copied().unwrap_or(0.0) as i64;
+        let network_send_rate = metrics_map.get("starrocks_be_network_send_rate").copied().unwrap_or(0.0);
+        let network_receive_rate = metrics_map.get("starrocks_be_network_receive_rate").copied().unwrap_or(0.0);
+        
+        // IO metrics (BE)
+        let io_read_bytes_total = metrics_map.get("starrocks_be_disk_read_bytes").copied().unwrap_or(0.0) as i64;
+        let io_write_bytes_total = metrics_map.get("starrocks_be_disk_write_bytes").copied().unwrap_or(0.0) as i64;
+        let io_read_rate = metrics_map.get("starrocks_be_disk_read_rate").copied().unwrap_or(0.0);
+        let io_write_rate = metrics_map.get("starrocks_be_disk_write_rate").copied().unwrap_or(0.0);
+        
         // Create snapshot
         let snapshot = MetricsSnapshot {
             cluster_id: cluster.id,
@@ -255,6 +294,18 @@ impl MetricsCollectorService {
             jvm_heap_used,
             jvm_heap_usage_pct,
             jvm_thread_count: runtime_info.thread_cnt,
+            
+            // Network metrics
+            network_bytes_sent_total,
+            network_bytes_received_total,
+            network_send_rate,
+            network_receive_rate,
+            
+            // IO metrics
+            io_read_bytes_total,
+            io_write_bytes_total,
+            io_read_rate,
+            io_write_rate,
         };
         
         // Save to database
@@ -286,7 +337,9 @@ impl MetricsCollectorService {
                 tablet_count, max_compaction_score,
                 txn_running, txn_success_total, txn_failed_total,
                 load_running, load_finished_total,
-                jvm_heap_total, jvm_heap_used, jvm_heap_usage_pct, jvm_thread_count
+                jvm_heap_total, jvm_heap_used, jvm_heap_usage_pct, jvm_thread_count,
+                network_bytes_sent_total, network_bytes_received_total, network_send_rate, network_receive_rate,
+                io_read_bytes_total, io_write_bytes_total, io_read_rate, io_write_rate
             ) VALUES (
                 ?, ?,
                 ?, ?, ?, ?, ?,
@@ -297,6 +350,8 @@ impl MetricsCollectorService {
                 ?, ?,
                 ?, ?, ?,
                 ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?,
                 ?, ?, ?, ?
             )
             "#,
@@ -332,7 +387,15 @@ impl MetricsCollectorService {
             snapshot.jvm_heap_total,
             snapshot.jvm_heap_used,
             snapshot.jvm_heap_usage_pct,
-            snapshot.jvm_thread_count
+            snapshot.jvm_thread_count,
+            snapshot.network_bytes_sent_total,
+            snapshot.network_bytes_received_total,
+            snapshot.network_send_rate,
+            snapshot.network_receive_rate,
+            snapshot.io_read_bytes_total,
+            snapshot.io_write_bytes_total,
+            snapshot.io_read_rate,
+            snapshot.io_write_rate
         )
         .execute(&self.db)
         .await?;
@@ -439,5 +502,167 @@ fn parse_storage_size(size_str: &str) -> Option<i64> {
     };
 
     Some(bytes as i64)
+}
+
+impl MetricsCollectorService {
+    /// Run daily aggregation for all clusters
+    async fn run_daily_aggregation_all_clusters(&self) -> Result<(), anyhow::Error> {
+        let clusters = self.cluster_service.list_clusters().await?;
+        
+        tracing::info!("Starting daily aggregation for {} clusters", clusters.len());
+        
+        for cluster in clusters {
+            if let Err(e) = self.run_daily_aggregation_for_cluster(cluster.id).await {
+                tracing::error!(
+                    "Failed to run daily aggregation for cluster {} ({}): {}",
+                    cluster.id,
+                    cluster.name,
+                    e
+                );
+            }
+        }
+        
+        // Cleanup old daily snapshots (keep 90 days)
+        self.cleanup_old_daily_snapshots().await?;
+        
+        Ok(())
+    }
+
+    /// Run daily aggregation for a single cluster
+    /// Aggregates yesterday's metrics_snapshots into daily_snapshots
+    async fn run_daily_aggregation_for_cluster(&self, cluster_id: i64) -> ApiResult<()> {
+        let yesterday = Utc::now().date_naive() - chrono::Duration::days(1);
+        let yesterday_start = yesterday.and_hms_opt(0, 0, 0).unwrap().and_utc();
+        let yesterday_end = yesterday.and_hms_opt(23, 59, 59).unwrap().and_utc();
+        
+        tracing::debug!(
+            "Aggregating metrics for cluster {} from {} to {}",
+            cluster_id,
+            yesterday_start,
+            yesterday_end
+        );
+        
+        // Query all snapshots from yesterday
+        let snapshots = sqlx::query!(
+            r#"
+            SELECT
+                AVG(qps) as avg_qps,
+                MAX(qps) as max_qps,
+                MIN(qps) as min_qps,
+                AVG(query_latency_p99) as avg_latency_p99,
+                MAX(query_latency_p99) as max_latency_p99,
+                SUM(query_total) as total_queries,
+                SUM(query_error) as total_errors,
+                AVG(avg_cpu_usage) as avg_cpu_usage,
+                MAX(avg_cpu_usage) as max_cpu_usage,
+                AVG(avg_memory_usage) as avg_memory_usage,
+                MAX(avg_memory_usage) as max_memory_usage,
+                AVG(disk_usage_pct) as avg_disk_usage,
+                MAX(disk_usage_pct) as max_disk_usage,
+                AVG(disk_used_bytes) as avg_disk_used_bytes,
+                MAX(disk_used_bytes) as max_disk_used_bytes
+            FROM metrics_snapshots
+            WHERE cluster_id = ?
+                AND collected_at >= ?
+                AND collected_at <= ?
+            "#,
+            cluster_id,
+            yesterday_start,
+            yesterday_end
+        )
+        .fetch_one(&self.db)
+        .await?;
+        
+        // Calculate derived metrics
+        let total_queries = snapshots.total_queries.unwrap_or(0);
+        let total_errors = snapshots.total_errors.unwrap_or(0);
+        let error_rate = if total_queries > 0 {
+            (total_errors as f64 / total_queries as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        // Insert or update daily snapshot
+        sqlx::query!(
+            r#"
+            INSERT INTO daily_snapshots (
+                cluster_id, snapshot_date,
+                avg_qps, max_qps, min_qps,
+                avg_latency_p99, max_latency_p99,
+                total_queries, total_errors, error_rate,
+                avg_cpu_usage, max_cpu_usage,
+                avg_memory_usage, max_memory_usage,
+                avg_disk_usage, max_disk_usage,
+                total_data_bytes, daily_data_growth_bytes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(cluster_id, snapshot_date) DO UPDATE SET
+                avg_qps = excluded.avg_qps,
+                max_qps = excluded.max_qps,
+                min_qps = excluded.min_qps,
+                avg_latency_p99 = excluded.avg_latency_p99,
+                max_latency_p99 = excluded.max_latency_p99,
+                total_queries = excluded.total_queries,
+                total_errors = excluded.total_errors,
+                error_rate = excluded.error_rate,
+                avg_cpu_usage = excluded.avg_cpu_usage,
+                max_cpu_usage = excluded.max_cpu_usage,
+                avg_memory_usage = excluded.avg_memory_usage,
+                max_memory_usage = excluded.max_memory_usage,
+                avg_disk_usage = excluded.avg_disk_usage,
+                max_disk_usage = excluded.max_disk_usage,
+                total_data_bytes = excluded.total_data_bytes,
+                daily_data_growth_bytes = excluded.daily_data_growth_bytes
+            "#,
+            cluster_id,
+            yesterday,
+            snapshots.avg_qps.unwrap_or(0.0),
+            snapshots.max_qps.unwrap_or(0.0),
+            snapshots.min_qps.unwrap_or(0.0),
+            snapshots.avg_latency_p99.unwrap_or(0.0),
+            snapshots.max_latency_p99.unwrap_or(0.0),
+            total_queries,
+            total_errors,
+            error_rate,
+            snapshots.avg_cpu_usage.unwrap_or(0.0),
+            snapshots.max_cpu_usage.unwrap_or(0.0),
+            snapshots.avg_memory_usage.unwrap_or(0.0),
+            snapshots.max_memory_usage.unwrap_or(0.0),
+            snapshots.avg_disk_usage.unwrap_or(0.0),
+            snapshots.max_disk_usage.unwrap_or(0.0),
+            snapshots.avg_disk_used_bytes.unwrap_or(0) as i64,
+            0 as i64 // daily_data_growth_bytes (would need previous day's value)
+        )
+        .execute(&self.db)
+        .await?;
+        
+        tracing::info!(
+            "Daily aggregation completed for cluster {} (date: {})",
+            cluster_id,
+            yesterday
+        );
+        
+        Ok(())
+    }
+
+    /// Cleanup old daily snapshots (keep 90 days)
+    async fn cleanup_old_daily_snapshots(&self) -> Result<(), sqlx::Error> {
+        let cutoff_date = Utc::now().date_naive() - chrono::Duration::days(90);
+        
+        let result = sqlx::query!(
+            "DELETE FROM daily_snapshots WHERE snapshot_date < ?",
+            cutoff_date
+        )
+        .execute(&self.db)
+        .await?;
+        
+        if result.rows_affected() > 0 {
+            tracing::info!(
+                "Cleaned up {} old daily snapshots (older than 90 days)",
+                result.rows_affected()
+            );
+        }
+        
+        Ok(())
+    }
 }
 

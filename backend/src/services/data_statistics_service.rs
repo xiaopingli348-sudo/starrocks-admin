@@ -3,7 +3,7 @@
 // Design Ref: CLUSTER_OVERVIEW_PLAN.md
 
 use crate::models::Cluster;
-use crate::services::{ClusterService, MySQLClient, MySQLPoolManager, StarRocksClient};
+use crate::services::{ClusterService, MaterializedViewService, MySQLClient, MySQLPoolManager, StarRocksClient};
 use crate::utils::ApiResult;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -106,7 +106,7 @@ impl DataStatisticsService {
         
         // Get materialized view statistics
         let (mv_total, mv_running, mv_failed, mv_success) = 
-            self.get_mv_statistics(&client).await?;
+            self.get_mv_statistics(&cluster).await?;
         
         // Get schema change statistics
         let (schema_change_running, schema_change_pending, schema_change_finished, schema_change_failed) =
@@ -283,12 +283,37 @@ impl DataStatisticsService {
     }
 
     /// Get materialized view statistics
-    async fn get_mv_statistics(&self, client: &StarRocksClient) -> ApiResult<(i32, i32, i32, i32)> {
-        // TODO: Implement when MV metrics are available
-        // For now, return zeros
+    async fn get_mv_statistics(&self, cluster: &Cluster) -> ApiResult<(i32, i32, i32, i32)> {
+        // Create MV service for this cluster
+        let pool = self.mysql_pool_manager.get_pool(cluster).await?;
+        let mysql_client = MySQLClient::from_pool(pool);
+        let mv_service = MaterializedViewService::new(mysql_client);
         
-        tracing::debug!("MV statistics collection not yet implemented");
-        Ok((0, 0, 0, 0))
+        // Get all materialized views
+        let mvs = mv_service.list_materialized_views(None).await?;
+        
+        let mv_total = mvs.len() as i32;
+        
+        // Count by state
+        // Note: StarRocks MV states:
+        // - is_active=true: MV is active and can be used
+        // - is_active=false: MV is inactive (failed or paused)
+        // - refresh_type: MANUAL/ASYNC
+        let mv_active = mvs.iter().filter(|mv| mv.is_active).count() as i32;
+        let mv_inactive = mvs.iter().filter(|mv| !mv.is_active).count() as i32;
+        
+        // For now, consider active MVs as "success" and inactive as "failed"
+        // In the future, we could query task history for more accurate stats
+        let mv_success = mv_active;
+        let mv_failed = mv_inactive;
+        let mv_running = 0; // Would need to query running tasks
+        
+        tracing::debug!(
+            "MV statistics: total={}, active={}, inactive={}",
+            mv_total, mv_active, mv_inactive
+        );
+        
+        Ok((mv_total, mv_running, mv_failed, mv_success))
     }
 
     /// Get schema change statistics
