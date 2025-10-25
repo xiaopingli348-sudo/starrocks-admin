@@ -1,0 +1,442 @@
+@import '~@nebular/theme/styles/globals';
+
+.cluster-overview {
+  padding: 0;
+
+  // Header Section
+  .header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+
+    .page-title {
+      margin: 0;
+      @include nb-theme(color-fg-heading);
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+
+      nb-select {
+        min-width: 120px;
+      }
+
+      button {
+        white-space: nowrap;
+      }
+    }
+  }
+
+  // Loading
+  .loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+  }
+
+  // Health Cards Section (横向网格，类似图片)
+  .health-cards-section {
+    margin-bottom: 1.5rem;
+
+    .section-title {
+      margin-bottom: 1rem;
+      @include nb-theme(color-fg-heading);
+    }
+
+    .health-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+
+      @media (min-width: 768px) {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      @media (min-width: 1200px) {
+        grid-template-columns: repeat(5, 1fr);
+      }
+
+      .health-card {
+        transition: transform 0.2s ease;
+        
+        &.clickable {
+          cursor: pointer;
+          
+          &:hover {
+            transform: translateY(-2px);
+          }
+        }
+
+        nb-card-body {
+          display: flex;
+          align-items: center;
+          padding: 1.25rem;
+
+          .card-icon {
+            font-size: 2rem;
+            margin-right: 0.75rem;
+            
+            nb-icon {
+              font-size: 2rem;
+            }
+          }
+
+          .card-content {
+            flex: 1;
+
+            .card-title {
+              margin: 0 0 0.25rem 0;
+              font-size: 0.875rem;
+              font-weight: 400;
+              opacity: 0.7;
+            }
+
+            .card-value {
+              margin: 0;
+              font-size: 1.75rem;
+              font-weight: 600;
+              line-height: 1.2;
+
+              .card-unit {
+                font-size: 0.875rem;
+                font-weight: 400;
+                margin-left: 0.25rem;
+                opacity: 0.7;
+              }
+            }
+
+            .card-trend {
+              margin-top: 0.25rem;
+              font-size: 0.75rem;
+              display: flex;
+              align-items: center;
+              gap: 0.25rem;
+
+              nb-icon {
+                font-size: 1rem;
+              }
+
+              .trend-success {
+                color: nb-theme(color-success-default);
+              }
+
+              .trend-danger {
+                color: nb-theme(color-danger-default);
+              }
+
+              .trend-basic {
+                color: nb-theme(color-basic-600);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Main Content Grid (2列布局)
+  .main-content-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+
+    @media (min-width: 1200px) {
+      grid-template-columns: 2fr 1fr;
+    }
+
+    .left-column,
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+  }
+
+  // Chart Card (使用 ngx-admin 原生卡片)
+  .chart-card {
+    nb-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid nb-theme(border-basic-color-3);
+
+      nb-icon {
+        font-size: 1.25rem;
+      }
+    }
+
+    nb-card-body {
+      padding: 1.5rem;
+    }
+
+    .chart-container {
+      margin-bottom: 2rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .chart-title {
+        margin: 0 0 0.75rem 0;
+        font-size: 0.875rem;
+        font-weight: 500;
+        opacity: 0.8;
+      }
+
+      .echart {
+        height: 250px;
+        width: 100%;
+      }
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 2rem;
+      opacity: 0.6;
+    }
+  }
+
+  // Stats Card (右侧统计卡片)
+  .stats-card {
+    &.clickable {
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      
+      &:hover {
+        transform: translateY(-2px);
+      }
+    }
+
+    nb-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid nb-theme(border-basic-color-3);
+
+      nb-icon {
+        font-size: 1.25rem;
+      }
+    }
+
+    nb-card-body {
+      padding: 1.25rem;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid nb-theme(border-basic-color-4);
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .stats-label {
+        opacity: 0.7;
+        font-size: 0.875rem;
+      }
+
+      .stats-value {
+        font-weight: 600;
+
+        &.text-success {
+          color: nb-theme(color-success-default);
+        }
+
+        &.text-warning {
+          color: nb-theme(color-warning-default);
+        }
+
+        &.text-danger {
+          color: nb-theme(color-danger-default);
+        }
+
+        &.text-info {
+          color: nb-theme(color-info-default);
+        }
+      }
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+
+      .stats-item {
+        text-align: center;
+        padding: 0.75rem;
+        background-color: nb-theme(background-basic-color-2);
+        border-radius: nb-theme(border-radius);
+
+        h4 {
+          margin: 0 0 0.25rem 0;
+          font-size: 1.5rem;
+          font-weight: 600;
+
+          &.text-success {
+            color: nb-theme(color-success-default);
+          }
+
+          &.text-warning {
+            color: nb-theme(color-warning-default);
+          }
+
+          &.text-danger {
+            color: nb-theme(color-danger-default);
+          }
+
+          &.text-info {
+            color: nb-theme(color-info-default);
+          }
+        }
+
+        p {
+          margin: 0;
+          font-size: 0.75rem;
+          opacity: 0.7;
+        }
+      }
+    }
+  }
+
+  // Capacity Card
+  .capacity-card {
+    .capacity-progress {
+      margin-bottom: 1rem;
+
+      .progress-label {
+        display: block;
+        margin-top: 0.5rem;
+        text-align: right;
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+    }
+
+    .capacity-stats {
+      .stats-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid nb-theme(border-basic-color-4);
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        .stats-label {
+          opacity: 0.7;
+          font-size: 0.875rem;
+        }
+
+        .stats-value {
+          font-weight: 600;
+
+          &.text-danger {
+            color: nb-theme(color-danger-default);
+          }
+        }
+      }
+    }
+  }
+
+  // Table Card
+  .table-card {
+    &.clickable {
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      
+      &:hover {
+        transform: translateY(-2px);
+      }
+    }
+
+    nb-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid nb-theme(border-basic-color-3);
+
+      nb-icon {
+        font-size: 1.25rem;
+      }
+    }
+
+    .simple-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+
+      thead {
+        tr {
+          border-bottom: 2px solid nb-theme(border-basic-color-3);
+
+          th {
+            padding: 0.75rem 0.5rem;
+            text-align: left;
+            font-weight: 600;
+            opacity: 0.8;
+          }
+        }
+      }
+
+      tbody {
+        tr {
+          border-bottom: 1px solid nb-theme(border-basic-color-4);
+          transition: background-color 0.15s ease;
+
+          &:hover {
+            background-color: nb-theme(background-basic-color-2);
+          }
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          td {
+            padding: 0.75rem 0.5rem;
+
+            &.query-preview {
+              max-width: 200px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+          }
+        }
+      }
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 2rem;
+      opacity: 0.6;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 767px) {
+  .cluster-overview {
+    .header-section {
+      .controls {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 1rem;
+      }
+    }
+
+    .main-content-grid {
+      .chart-container .echart {
+        height: 200px;
+      }
+    }
+  }
+}
+
