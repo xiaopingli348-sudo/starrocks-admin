@@ -135,31 +135,31 @@
   }
   
   // 为每个分类添加左边框标识,而不是整个卡片背景色
-  &[data-category="集群信息"] nb-card-header {
+  &[data-category='集群信息'] nb-card-header {
     border-left: 3px solid var(--color-info-500);
   }
   
-  &[data-category="数据库管理"] nb-card-header {
+  &[data-category='数据库管理'] nb-card-header {
     border-left: 3px solid var(--color-success-500);
   }
   
-  &[data-category="事务管理"] nb-card-header {
+  &[data-category='事务管理'] nb-card-header {
     border-left: 3px solid var(--color-warning-500);
   }
   
-  &[data-category="任务管理"] nb-card-header {
+  &[data-category='任务管理'] nb-card-header {
     border-left: 3px solid var(--color-primary-500);
   }
   
-  &[data-category="元数据管理"] nb-card-header {
+  &[data-category='元数据管理'] nb-card-header {
     border-left: 3px solid var(--border-basic-color-4);
   }
   
-  &[data-category="存储管理"] nb-card-header {
+  &[data-category='存储管理'] nb-card-header {
     border-left: 3px solid var(--color-danger-500);
   }
   
-  &[data-category="作业管理"] nb-card-header {
+  &[data-category='作业管理'] nb-card-header {
     border-left: 3px solid var(--color-control-default);
   }
 }
