@@ -11,11 +11,13 @@ DIST_DIR := $(BUILD_DIR)/dist
 help:
 	@echo "StarRocks Admin - Build Commands:"
 	@echo ""
-	@echo "Development:"
-	@echo "  make lint         - Run clippy with strict checks"
+	@echo "🔧 Code Quality:"
 	@echo "  make fmt          - Format code with rustfmt"
+	@echo "  make fmt-check    - Check code formatting"
+	@echo "  make clippy       - Run clippy checks (fix + strict)"
 	@echo "  make check        - Run cargo check"
-	@echo "  make pre-commit   - Run pre-commit checks (clippy + fmt)"
+	@echo "  make pre-commit   - Run all pre-commit checks (fmt + clippy + check)"
+	@echo "  make lint         - Alias for clippy"
 	@echo ""
 	@echo "Build:"
 	@echo "  make build        - Build backend and frontend (runs pre-commit first)"
@@ -25,25 +27,33 @@ help:
 	@echo "  make clean        - Clean build artifacts"
 	@echo ""
 
-# Run clippy with strict checks
-lint:
-	@echo "Running clippy with strict checks..."
-	@cd $(BACKEND_DIR) && cargo clippy --all-targets -- --deny warnings --allow clippy::uninlined-format-args
-
 # Format code
 fmt:
-	@echo "Formatting code..."
-	@cd $(BACKEND_DIR) && cargo fmt
+	@echo "🔧 Formatting code..."
+	@cd $(BACKEND_DIR) && cargo fmt --all
+
+# Check code formatting
+fmt-check:
+	@echo "📝 Checking code formatting..."
+	@cd $(BACKEND_DIR) && cargo fmt --all --check
+
+# Run clippy checks (following rustfs standard)
+clippy:
+	@echo "🔍 Running clippy checks..."
+	@cd $(BACKEND_DIR) && DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --fix --allow-dirty --all-targets
+	@cd $(BACKEND_DIR) && DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --all-targets --all-features -- -D warnings
 
 # Run cargo check
 check:
-	@echo "Running cargo check..."
-	@cd $(BACKEND_DIR) && cargo check
+	@echo "🔨 Running cargo check..."
+	@cd $(BACKEND_DIR) && cargo check --all-targets
 
-# Run pre-commit checks
-pre-commit:
-	@echo "Running pre-commit checks..."
-	@bash $(BUILD_DIR)/pre-commit.sh
+# Legacy alias for clippy
+lint: clippy
+
+# Run pre-commit checks (following rustfs standard)
+pre-commit: fmt clippy check
+	@echo "✅ All pre-commit checks passed!"
 
 # Build both backend and frontend (runs pre-commit first)
 build: pre-commit
