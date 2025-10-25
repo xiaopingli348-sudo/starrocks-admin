@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 
 # Pre-commit hook for StarRocks Admin
-# This script runs clippy and rustfmt to ensure code quality
+# Following rustfs standard: fmt + clippy + check
 
 set -e
 
-echo "Running clippy with strict checks..."
+echo "🔧 Running pre-commit checks..."
 cd backend
 
-# Fix clippy warnings automatically
-cargo clippy --fix --all-targets --allow-dirty --allow-staged --allow-no-vcs -- --deny warnings --allow clippy::uninlined-format-args
+# 1. Format code
+echo "📝 Formatting code..."
+cargo fmt --all
 
-# Format code
-cargo fmt
+# 2. Run clippy (fix + strict check)
+echo "🔍 Running clippy checks..."
+DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --fix --allow-dirty --allow-staged --allow-no-vcs --all-targets
+DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --all-targets --all-features -- -D warnings
 
-# Run clippy check (fail if any warnings)
-if ! cargo clippy --all-targets -- --deny warnings --allow clippy::uninlined-format-args; then
-  echo "❌ Clippy check failed"
-  exit 1
-fi
+# 3. Run cargo check
+echo "🔨 Running cargo check..."
+cargo check --all-targets
 
-echo "✅ All checks passed!"
-
+echo "✅ All pre-commit checks passed!"

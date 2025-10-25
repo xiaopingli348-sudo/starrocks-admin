@@ -3,6 +3,13 @@ name = "starrocks-admin"
 version = "0.1.0"
 edition = "2024"
 
+# Lint configuration (following rustfs standard)
+[lints.rust]
+unsafe_code = "warn"
+
+[lints.clippy]
+all = "warn"
+
 [dependencies]
 # Web framework
 axum = { version = "0.7", features = ["macros"] }
