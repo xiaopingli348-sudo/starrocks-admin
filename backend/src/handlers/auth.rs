@@ -1,8 +1,10 @@
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use std::sync::Arc;
 
 use crate::AppState;
-use crate::models::{CreateUserRequest, UpdateUserRequest, LoginRequest, LoginResponse, UserResponse};
+use crate::models::{
+    CreateUserRequest, LoginRequest, LoginResponse, UpdateUserRequest, UserResponse,
+};
 use crate::utils::ApiResult;
 
 // Register a new user
@@ -22,9 +24,9 @@ pub async fn register(
 ) -> ApiResult<Json<UserResponse>> {
     tracing::info!("User registration attempt for username: {}", req.username);
     tracing::debug!("Registration request: username={}, email={:?}", req.username, req.email);
-    
+
     let user = state.auth_service.register(req).await?;
-    
+
     tracing::info!("User registered successfully: {} (ID: {})", user.username, user.id);
     Ok(Json(user.into()))
 }
@@ -46,16 +48,13 @@ pub async fn login(
 ) -> ApiResult<Json<LoginResponse>> {
     tracing::info!("User login attempt for username: {}", req.username);
     tracing::debug!("Login request: username={}", req.username);
-    
+
     let (user, token) = state.auth_service.login(req).await?;
 
     tracing::info!("User logged in successfully: {} (ID: {})", user.username, user.id);
     tracing::debug!("JWT token generated for user: {}", user.username);
 
-    Ok(Json(LoginResponse {
-        token,
-        user: user.into(),
-    }))
+    Ok(Json(LoginResponse { token, user: user.into() }))
 }
 
 // Get current user info
@@ -76,9 +75,9 @@ pub async fn get_me(
     axum::extract::Extension(user_id): axum::extract::Extension<i64>,
 ) -> ApiResult<Json<UserResponse>> {
     tracing::debug!("Getting user info for user_id: {}", user_id);
-    
+
     let user = state.auth_service.get_user_by_id(user_id).await?;
-    
+
     tracing::debug!("User info retrieved successfully: {} (ID: {})", user.username, user.id);
     Ok(Json(user.into()))
 }
@@ -99,17 +98,20 @@ pub async fn get_me(
     tag = "Authentication"
 )]
 pub async fn update_me(
-    State(auth_service): State<AuthServiceState>,
+    State(state): State<Arc<AppState>>,
     axum::extract::Extension(user_id): axum::extract::Extension<i64>,
     Json(req): Json<UpdateUserRequest>,
 ) -> ApiResult<Json<UserResponse>> {
     tracing::info!("User update attempt for user_id: {}", user_id);
-    tracing::debug!("Update request: email={:?}, avatar={:?}, changing_password={}",
-        req.email, req.avatar, req.new_password.is_some());
-    
-    let user = auth_service.update_user(user_id, req).await?;
-    
+    tracing::debug!(
+        "Update request: email={:?}, avatar={:?}, changing_password={}",
+        req.email,
+        req.avatar,
+        req.new_password.is_some()
+    );
+
+    let user = state.auth_service.update_user(user_id, req).await?;
+
     tracing::info!("User updated successfully: {} (ID: {})", user.username, user.id);
     Ok(Json(user.into()))
 }
-

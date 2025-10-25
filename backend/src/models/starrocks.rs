@@ -24,7 +24,7 @@ where
 pub struct Backend {
     #[serde(rename = "BackendId")]
     pub backend_id: String,
-    #[serde(rename = "IP", alias = "Host")]  // Support both IP and Host
+    #[serde(rename = "IP", alias = "Host")] // Support both IP and Host
     pub host: String,
     #[serde(rename = "HeartbeatPort")]
     pub heartbeat_port: String,
@@ -69,7 +69,7 @@ pub struct Backend {
 pub struct Frontend {
     #[serde(rename = "Name")]
     pub name: String,
-    #[serde(rename = "IP", alias = "Host")]  // Support both IP and Host
+    #[serde(rename = "IP", alias = "Host")] // Support both IP and Host
     pub host: String,
     #[serde(rename = "EditLogPort")]
     pub edit_log_port: String,
@@ -81,7 +81,7 @@ pub struct Frontend {
     pub rpc_port: String,
     #[serde(rename = "Role")]
     pub role: String,
-    #[serde(rename = "IsMaster", default)]  // IsMaster field, optional
+    #[serde(rename = "IsMaster", default)] // IsMaster field, optional
     pub is_master: Option<String>,
     #[serde(rename = "ClusterId")]
     pub cluster_id: String,
@@ -164,7 +164,6 @@ fn default_scope() -> String {
     "GLOBAL".to_string()
 }
 
-
 // Finished (historical) query item sourced from audit tables
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct QueryHistoryItem {
@@ -239,6 +238,7 @@ pub struct TableInfo {
 
 // Schema change information
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[allow(dead_code)]
 pub struct SchemaChange {
     pub job_id: String,
     pub table_name: String,
@@ -353,4 +353,3 @@ pub struct ProfileDetail {
     pub query_id: String,
     pub profile_content: String,
 }
-

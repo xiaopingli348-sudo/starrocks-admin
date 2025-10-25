@@ -71,19 +71,16 @@ export class VariablesComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    console.log('[Variables] ngOnInit - Initial clusterId:', this.clusterId);
     
     // Subscribe to active cluster changes
     this.clusterContext.activeCluster$
       .pipe(takeUntil(this.destroy$))
       .subscribe(cluster => {
-        console.log('[Variables] Active cluster changed:', cluster);
         this.activeCluster = cluster;
         if (cluster) {
           // Always use the active cluster (override route parameter)
           const newClusterId = cluster.id;
           if (this.clusterId !== newClusterId) {
-            console.log('[Variables] Switching cluster from', this.clusterId, 'to', newClusterId);
             this.clusterId = newClusterId;
             this.loadVariables();
           }
@@ -92,10 +89,8 @@ export class VariablesComponent implements OnInit, OnDestroy {
 
     // Load variables if clusterId is already set
     if (this.clusterId && this.clusterId > 0) {
-      console.log('[Variables] Loading with route clusterId:', this.clusterId);
       this.loadVariables();
     } else if (!this.clusterContext.hasActiveCluster()) {
-      console.log('[Variables] No active cluster found');
       this.toastrService.warning('请先在集群概览页面激活一个集群', '提示');
     }
   }
@@ -107,20 +102,17 @@ export class VariablesComponent implements OnInit, OnDestroy {
 
   loadVariables(): void {
     if (!this.clusterId || this.clusterId === 0) {
-      console.log('[Variables] No valid clusterId, skipping load');
       this.loading = false;
       return;
     }
 
-    console.log('[Variables] Loading variables for cluster:', this.clusterId, 'type:', this.variableType);
     this.loading = true;
     this.nodeService.getVariables(
-      this.clusterId,
+      
       this.variableType,
       this.searchText || undefined
     ).subscribe({
       next: (variables) => {
-        console.log('[Variables] Loaded variables:', variables.length);
         this.variables = variables;
         this.source.load(variables);
         this.loading = false;
@@ -146,7 +138,7 @@ export class VariablesComponent implements OnInit, OnDestroy {
     const newValue = prompt(`修改变量 "${variable.name}":`, variable.value);
     if (newValue !== null && newValue !== variable.value) {
       this.loading = true;
-      this.nodeService.updateVariable(this.clusterId, variable.name, {
+      this.nodeService.updateVariable(variable.name, {
         value: newValue,
         scope: this.variableType.toUpperCase(),
       }).subscribe({

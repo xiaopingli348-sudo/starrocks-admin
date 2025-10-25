@@ -169,19 +169,15 @@ export class QueriesComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    console.log('[Queries] ngOnInit - Initial clusterId:', this.clusterId);
-    
     // Subscribe to active cluster changes
     this.clusterContext.activeCluster$
       .pipe(takeUntil(this.destroy$))
       .subscribe(cluster => {
-        console.log('[Queries] Active cluster changed:', cluster);
         this.activeCluster = cluster;
         if (cluster) {
           // Always use the active cluster (override route parameter)
           const newClusterId = cluster.id;
           if (this.clusterId !== newClusterId) {
-            console.log('[Queries] Switching cluster from', this.clusterId, 'to', newClusterId);
             this.clusterId = newClusterId;
             // Reset pagination when cluster changes
             this.historyCurrentPage = 1;
@@ -197,7 +193,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
 
     // Load queries if clusterId is already set from route
     if (this.clusterId && this.clusterId > 0) {
-      console.log('[Queries] Loading with route clusterId:', this.clusterId);
       // Only load if not on realtime tab
       if (this.selectedTab !== 'realtime') {
         this.loadCurrentTab();
@@ -205,7 +200,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
         this.loading = false;
       }
     } else if (!this.clusterContext.hasActiveCluster()) {
-      console.log('[Queries] No active cluster found');
       this.toastrService.warning('请先在集群概览页面激活一个集群', '提示');
       this.loading = false;
     }
@@ -219,7 +213,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
 
   // Tab switching
   selectTab(tab: string): void {
-    console.log('[Queries] Switching to tab:', tab);
     this.selectedTab = tab;
     this.loadCurrentTab();
   }
@@ -259,7 +252,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
 
   // Load data based on current tab
   loadCurrentTab(): void {
-    console.log('[Queries] loadCurrentTab called, selectedTab:', this.selectedTab);
     if (this.selectedTab === 'running') {
       this.loadRunningQueries();
     } else if (this.selectedTab === 'history') {
@@ -274,22 +266,13 @@ export class QueriesComponent implements OnInit, OnDestroy {
 
   // Load running queries
   loadRunningQueries(): void {
-    if (!this.clusterId || this.clusterId === 0) {
-      console.log('[Queries] No valid clusterId, skipping load');
-      this.loading = false;
-      return;
-    }
-    
-    console.log('[Queries] Loading running queries for cluster:', this.clusterId);
     this.loading = true;
-    this.nodeService.listQueries(this.clusterId).subscribe({
+    this.nodeService.listQueries().subscribe({
       next: (queries) => {
-        console.log('[Queries] Loaded running queries:', queries.length);
         this.runningSource.load(queries);
         this.loading = false;
       },
       error: (error) => {
-        console.error('[Queries] Error loading running queries:', error);
         this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '加载失败');
         this.loading = false;
       },
@@ -298,31 +281,12 @@ export class QueriesComponent implements OnInit, OnDestroy {
 
   // Load history queries with server-side pagination
   loadHistoryQueries(): void {
-    if (!this.clusterId || this.clusterId === 0) {
-      console.log('[Queries] No valid clusterId, skipping load');
-      this.loading = false;
-      this.historySource.load([]);
-      return;
-    }
-    
     const offset = (this.historyCurrentPage - 1) * this.historyPageSize;
-    console.log('[Queries] Loading history queries:', {
-      cluster: this.clusterId,
-      page: this.historyCurrentPage,
-      pageSize: this.historyPageSize,
-      offset: offset
-    });
     
     this.loading = true;
     
-    this.nodeService.listQueryHistory(this.clusterId, this.historyPageSize, offset).subscribe({
+    this.nodeService.listQueryHistory(this.historyPageSize, offset).subscribe({
       next: (response) => {
-        console.log('[Queries] Loaded history queries:', {
-          total: response.total,
-          page: response.page,
-          pageSize: response.page_size,
-          dataCount: response.data.length
-        });
         
         // Update total count for pagination
         this.historyTotalCount = response.total;
@@ -332,7 +296,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
         this.loading = false;
       },
       error: (error) => {
-        console.error('[Queries] Error loading history queries:', error);
         this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '加载失败');
         this.historySource.load([]);
         this.historyTotalCount = 0;
@@ -340,7 +303,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
       },
       complete: () => {
         // Ensure loading is always set to false
-        console.log('[Queries] History query request completed');
         this.loading = false;
       }
     });
@@ -375,15 +337,8 @@ export class QueriesComponent implements OnInit, OnDestroy {
 
   // View query profile
   viewProfile(queryId: string): void {
-    if (!this.clusterId) {
-      this.toastrService.warning('集群ID未设置', '提示');
-      return;
-    }
-
-    console.log('[Queries] Fetching profile for query:', queryId);
-    this.nodeService.getQueryProfile(this.clusterId, queryId).subscribe({
+    this.nodeService.getQueryProfile(queryId).subscribe({
       next: (profile) => {
-        console.log('[Queries] Profile loaded:', profile);
         this.currentProfile = profile;
         // Open profile dialog
         this.dialogService.open(this.profileDialogTemplate, {
@@ -391,7 +346,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
         });
       },
       error: (error) => {
-        console.error('[Queries] Error loading profile:', error);
         this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '加载失败');
       },
     });
@@ -399,24 +353,17 @@ export class QueriesComponent implements OnInit, OnDestroy {
 
   // Real-time query methods
   executeSQL(): void {
-    if (!this.clusterId || this.clusterId === 0) {
-      this.toastrService.warning('请先选择一个集群', '提示');
-      return;
-    }
-
     if (!this.sqlInput || this.sqlInput.trim() === '') {
       this.toastrService.warning('请输入SQL语句', '提示');
       return;
     }
 
-    console.log('[Queries] Executing SQL:', this.sqlInput, 'with limit:', this.queryLimit);
     this.executing = true;
     this.queryResult = null;
     this.resultSettings = null;
 
-    this.nodeService.executeSQL(this.clusterId, this.sqlInput.trim(), this.queryLimit).subscribe({
+    this.nodeService.executeSQL(this.sqlInput.trim(), this.queryLimit).subscribe({
       next: (result) => {
-        console.log('[Queries] SQL executed successfully:', result);
         this.queryResult = result;
         this.executionTime = result.execution_time_ms;
         this.rowCount = result.row_count;
@@ -438,7 +385,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
         this.toastrService.success(`查询成功，返回 ${result.row_count} 行`, '成功');
       },
       error: (error) => {
-        console.error('[Queries] SQL execution error:', error);
         this.executing = false;
         this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '执行失败');
       },
@@ -576,7 +522,7 @@ export class QueriesComponent implements OnInit, OnDestroy {
   // Load profiles
   loadProfiles(): void {
     this.loading = true;
-    this.nodeService.listProfiles(this.clusterId).subscribe(
+    this.nodeService.listProfiles().subscribe(
       data => {
         this.profileSource.load(data);
         this.loading = false;
@@ -595,7 +541,7 @@ export class QueriesComponent implements OnInit, OnDestroy {
 
   // View profile detail from profile list
   viewProfileDetail(queryId: string): void {
-    this.nodeService.getProfile(this.clusterId, queryId).subscribe(
+    this.nodeService.getProfile(queryId).subscribe(
       data => {
         this.currentProfileDetail = data.profile_content;
         this.dialogService.open(this.profileDetailDialogTemplate, {

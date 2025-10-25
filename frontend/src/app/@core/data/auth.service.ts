@@ -10,6 +10,7 @@ export interface User {
   email?: string;
   avatar?: string;
   created_at: string;
+  active_cluster_id?: never;  // Removed field - should never exist
 }
 
 export interface LoginRequest {

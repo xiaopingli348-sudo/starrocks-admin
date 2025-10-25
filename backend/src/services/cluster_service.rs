@@ -1,4 +1,6 @@
-use crate::models::{Cluster, ClusterHealth, CreateClusterRequest, HealthCheck, HealthStatus, UpdateClusterRequest};
+use crate::models::{
+    Cluster, ClusterHealth, CreateClusterRequest, HealthCheck, HealthStatus, UpdateClusterRequest,
+};
 use crate::services::StarRocksClient;
 use crate::utils::{ApiError, ApiResult};
 use chrono::Utc;
@@ -28,7 +30,7 @@ impl ClusterService {
         if let Some(ref mut desc) = req.description {
             *desc = desc.trim().to_string();
         }
-        
+
         // Validate cleaned data
         if req.name.is_empty() {
             return Err(ApiError::validation_error("Cluster name cannot be empty"));
@@ -51,13 +53,23 @@ impl ClusterService {
         }
 
         // Convert tags to JSON string
-        let tags_json = req.tags.map(|t| serde_json::to_string(&t).unwrap_or_default());
+        let tags_json = req
+            .tags
+            .map(|t| serde_json::to_string(&t).unwrap_or_default());
+
+        // Check if this will be the first cluster
+        let existing_cluster_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM clusters")
+            .fetch_one(&self.pool)
+            .await?;
+
+        let is_first_cluster = existing_cluster_count.0 == 0;
 
         // Insert cluster (password is stored as-is for now, should be encrypted in production)
         let result = sqlx::query(
             "INSERT INTO clusters (name, description, fe_host, fe_http_port, fe_query_port, 
-             username, password_encrypted, enable_ssl, connection_timeout, tags, catalog, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             username, password_encrypted, enable_ssl, connection_timeout, tags, catalog, 
+             is_active, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&req.name)
         .bind(&req.description)
@@ -65,16 +77,37 @@ impl ClusterService {
         .bind(req.fe_http_port)
         .bind(req.fe_query_port)
         .bind(&req.username)
-        .bind(&req.password)  // TODO: Encrypt in production
+        .bind(&req.password) // TODO: Encrypt in production
         .bind(req.enable_ssl)
         .bind(req.connection_timeout)
         .bind(&tags_json)
         .bind(&req.catalog)
+        .bind(if is_first_cluster { 1 } else { 0 }) // Set as active if first cluster
         .bind(user_id)
         .execute(&self.pool)
         .await?;
 
         let cluster_id = result.last_insert_rowid();
+
+        // If this is the first cluster, it's already active
+        // Otherwise, ensure only this cluster is active if no active cluster exists
+        if !is_first_cluster {
+            let active_count: (i64,) =
+                sqlx::query_as("SELECT COUNT(*) FROM clusters WHERE is_active = 1")
+                    .fetch_one(&self.pool)
+                    .await?;
+
+            if active_count.0 == 0 {
+                // No active cluster exists, activate this new one
+                sqlx::query("UPDATE clusters SET is_active = 1 WHERE id = ?")
+                    .bind(cluster_id)
+                    .execute(&self.pool)
+                    .await?;
+                tracing::info!(
+                    "Automatically activated newly created cluster (no active cluster existed)"
+                );
+            }
+        }
 
         // Fetch and return the created cluster
         let cluster: Cluster = sqlx::query_as("SELECT * FROM clusters WHERE id = ?")
@@ -83,17 +116,24 @@ impl ClusterService {
             .await?;
 
         tracing::info!("Cluster created successfully: {} (ID: {})", cluster.name, cluster.id);
-        tracing::debug!("Cluster details: host={}, port={}, ssl={}, catalog={}", 
-                       cluster.fe_host, cluster.fe_http_port, cluster.enable_ssl, cluster.catalog);
+        tracing::debug!(
+            "Cluster details: host={}, port={}, ssl={}, catalog={}, active={}",
+            cluster.fe_host,
+            cluster.fe_http_port,
+            cluster.enable_ssl,
+            cluster.catalog,
+            cluster.is_active
+        );
 
         Ok(cluster)
     }
 
     // Get all clusters
     pub async fn list_clusters(&self) -> ApiResult<Vec<Cluster>> {
-        let clusters: Vec<Cluster> = sqlx::query_as("SELECT * FROM clusters ORDER BY created_at DESC")
-            .fetch_all(&self.pool)
-            .await?;
+        let clusters: Vec<Cluster> =
+            sqlx::query_as("SELECT * FROM clusters ORDER BY created_at DESC")
+                .fetch_all(&self.pool)
+                .await?;
 
         Ok(clusters)
     }
@@ -106,6 +146,48 @@ impl ClusterService {
             .await?;
 
         cluster.ok_or_else(|| ApiError::cluster_not_found(cluster_id))
+    }
+
+    // Get the currently active cluster
+    pub async fn get_active_cluster(&self) -> ApiResult<Cluster> {
+        let cluster: Option<Cluster> =
+            sqlx::query_as("SELECT * FROM clusters WHERE is_active = 1 LIMIT 1")
+                .fetch_optional(&self.pool)
+                .await?;
+
+        cluster.ok_or_else(|| {
+            ApiError::not_found("No active cluster found. Please activate a cluster first.")
+        })
+    }
+
+    // Set a cluster as active (deactivating all others)
+    pub async fn set_active_cluster(&self, cluster_id: i64) -> ApiResult<Cluster> {
+        // Check if cluster exists
+        let _cluster = self.get_cluster(cluster_id).await?;
+
+        // Start transaction to ensure atomicity
+        let mut tx = self.pool.begin().await?;
+
+        // First, deactivate all clusters
+        sqlx::query("UPDATE clusters SET is_active = 0")
+            .execute(&mut *tx)
+            .await?;
+
+        // Then, activate the target cluster
+        sqlx::query(
+            "UPDATE clusters SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        )
+        .bind(cluster_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Commit transaction
+        tx.commit().await?;
+
+        tracing::info!("Cluster activated: ID {}", cluster_id);
+
+        // Fetch and return the updated cluster
+        self.get_cluster(cluster_id).await
     }
 
     // Update cluster
@@ -172,10 +254,7 @@ impl ClusterService {
 
         updates.push("updated_at = CURRENT_TIMESTAMP");
 
-        let sql = format!(
-            "UPDATE clusters SET {} WHERE id = ?",
-            updates.join(", ")
-        );
+        let sql = format!("UPDATE clusters SET {} WHERE id = ?", updates.join(", "));
 
         let mut query = sqlx::query(&sql);
         for param in params {
@@ -192,6 +271,16 @@ impl ClusterService {
 
     // Delete cluster
     pub async fn delete_cluster(&self, cluster_id: i64) -> ApiResult<()> {
+        // Check if this is the active cluster
+        let is_active_result: Option<(bool,)> =
+            sqlx::query_as("SELECT is_active FROM clusters WHERE id = ?")
+                .bind(cluster_id)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        let is_active = is_active_result.map(|r| r.0).unwrap_or(false);
+
+        // Delete the cluster
         let result = sqlx::query("DELETE FROM clusters WHERE id = ?")
             .bind(cluster_id)
             .execute(&self.pool)
@@ -202,6 +291,22 @@ impl ClusterService {
         }
 
         tracing::info!("Cluster deleted: ID {}", cluster_id);
+
+        // If we deleted the active cluster, activate another one (first by creation time)
+        if is_active {
+            let next_cluster: Option<(i64,)> =
+                sqlx::query_as("SELECT id FROM clusters ORDER BY created_at DESC LIMIT 1")
+                    .fetch_optional(&self.pool)
+                    .await?;
+
+            if let Some((next_id,)) = next_cluster {
+                sqlx::query("UPDATE clusters SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    .bind(next_id)
+                    .execute(&self.pool)
+                    .await?;
+                tracing::info!("Automatically activated cluster ID {} after deletion", next_id);
+            }
+        }
 
         Ok(())
     }
@@ -222,7 +327,7 @@ impl ClusterService {
                     status: "ok".to_string(),
                     message: "FE is reachable and responding".to_string(),
                 });
-            }
+            },
             Err(e) => {
                 checks.push(HealthCheck {
                     name: "FE Availability".to_string(),
@@ -230,7 +335,7 @@ impl ClusterService {
                     message: format!("FE is not reachable: {}", e),
                 });
                 overall_status = HealthStatus::Critical;
-            }
+            },
         }
 
         // Check Backend nodes
@@ -249,10 +354,7 @@ impl ClusterService {
                     checks.push(HealthCheck {
                         name: "Backend Nodes".to_string(),
                         status: "warning".to_string(),
-                        message: format!(
-                            "{}/{} BE nodes are online",
-                            alive_count, total_count
-                        ),
+                        message: format!("{}/{} BE nodes are online", alive_count, total_count),
                     });
                     if overall_status == HealthStatus::Healthy {
                         overall_status = HealthStatus::Warning;
@@ -265,7 +367,7 @@ impl ClusterService {
                     });
                     overall_status = HealthStatus::Critical;
                 }
-            }
+            },
             Err(e) => {
                 checks.push(HealthCheck {
                     name: "Backend Nodes".to_string(),
@@ -275,14 +377,10 @@ impl ClusterService {
                 if overall_status == HealthStatus::Healthy {
                     overall_status = HealthStatus::Warning;
                 }
-            }
+            },
         }
 
-        Ok(ClusterHealth {
-            status: overall_status,
-            checks,
-            last_check_time: Utc::now(),
-        })
+        Ok(ClusterHealth { status: overall_status, checks, last_check_time: Utc::now() })
     }
 
     // Get cluster health for a specific cluster object (used for testing new clusters)
@@ -292,7 +390,7 @@ impl ClusterService {
         pool_manager: &crate::services::MySQLPoolManager,
     ) -> ApiResult<ClusterHealth> {
         use crate::services::MySQLClient;
-        
+
         let mut checks = Vec::new();
         let mut overall_status = HealthStatus::Healthy;
 
@@ -300,7 +398,7 @@ impl ClusterService {
         match pool_manager.get_pool(cluster).await {
             Ok(pool) => {
                 let mysql_client = MySQLClient::from_pool(pool);
-                
+
                 // Test basic connection
                 match mysql_client.query("SELECT 1").await {
                     Ok(_) => {
@@ -309,7 +407,7 @@ impl ClusterService {
                             status: "ok".to_string(),
                             message: "Connection successful".to_string(),
                         });
-                        
+
                         // Try to check FE availability via HTTP
                         let client = StarRocksClient::new(cluster.clone());
                         match client.get_runtime_info().await {
@@ -319,7 +417,7 @@ impl ClusterService {
                                     status: "ok".to_string(),
                                     message: "FE is reachable and responding".to_string(),
                                 });
-                            }
+                            },
                             Err(e) => {
                                 checks.push(HealthCheck {
                                     name: "FE Availability".to_string(),
@@ -329,13 +427,14 @@ impl ClusterService {
                                 if overall_status == HealthStatus::Healthy {
                                     overall_status = HealthStatus::Warning;
                                 }
-                            }
+                            },
                         }
-                        
+
                         // Try to check Backend nodes
                         match client.get_backends().await {
                             Ok(backends) => {
-                                let alive_count = backends.iter().filter(|b| b.alive == "true").count();
+                                let alive_count =
+                                    backends.iter().filter(|b| b.alive == "true").count();
                                 let total_count = backends.len();
 
                                 if total_count == 0 {
@@ -373,7 +472,7 @@ impl ClusterService {
                                     });
                                     overall_status = HealthStatus::Critical;
                                 }
-                            }
+                            },
                             Err(e) => {
                                 checks.push(HealthCheck {
                                     name: "Backend Nodes".to_string(),
@@ -383,9 +482,9 @@ impl ClusterService {
                                 if overall_status == HealthStatus::Healthy {
                                     overall_status = HealthStatus::Warning;
                                 }
-                            }
+                            },
                         }
-                    }
+                    },
                     Err(e) => {
                         checks.push(HealthCheck {
                             name: "Database Connection".to_string(),
@@ -393,9 +492,9 @@ impl ClusterService {
                             message: format!("Connection failed: {}", e),
                         });
                         overall_status = HealthStatus::Critical;
-                    }
+                    },
                 }
-            }
+            },
             Err(e) => {
                 checks.push(HealthCheck {
                     name: "Connection Pool".to_string(),
@@ -403,14 +502,9 @@ impl ClusterService {
                     message: format!("Failed to create connection pool: {}", e),
                 });
                 overall_status = HealthStatus::Critical;
-            }
+            },
         }
 
-        Ok(ClusterHealth {
-            status: overall_status,
-            checks,
-            last_check_time: Utc::now(),
-        })
+        Ok(ClusterHealth { status: overall_status, checks, last_check_time: Utc::now() })
     }
 }
-

@@ -5,36 +5,28 @@
     <p>Loading system functions...</p>
   </div>
 
-  <!-- No Active Cluster Alert -->
-  <div *ngIf="!activeCluster && !loading">
-    <nb-card status="warning">
-      <nb-card-body>
-        <div class="d-flex align-items-center">
-          <nb-icon icon="alert-triangle-outline" pack="eva" class="mr-3" style="font-size: 2rem;"></nb-icon>
-          <div>
-            <h5 class="mb-2">请先选择激活集群</h5>
-            <p class="mb-0">系统管理功能需要先选择一个激活的集群才能使用。请前往 <a routerLink="/pages/starrocks/dashboard" class="text-primary">集群概览</a> 页面选择要管理的集群。</p>
-          </div>
-        </div>
-      </nb-card-body>
-    </nb-card>
-  </div>
-
   <!-- Main View: Categories and Functions List -->
-  <div *ngIf="!selectedFunction && !loading && activeCluster" class="main-view">
+  <div *ngIf="!selectedFunction && !loading" class="main-view">
     <div class="page-header mb-3">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
-          <h3 class="mb-1">系统管理 | <span class="cluster-name-small">{{ activeCluster.name }}</span></h3>
-          <p class="text-muted mb-0">管理和监控 StarRocks 集群系统功能</p>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <button nbButton status="primary" size="small" (click)="openAddFunctionDialog()">
-            <nb-icon icon="plus-outline"></nb-icon>
-            添加功能
-          </button>
-        </div>
-      </div>
+      <nb-card>
+        <nb-card-header>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <h5 class="mb-0">系统管理</h5>
+              <span class="text-hint">|</span>
+              <span class="text-hint" style="font-size: 13px;">
+                集群: <strong>{{ activeCluster.name }}</strong>
+              </span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <button nbButton status="primary" size="small" (click)="openAddFunctionDialog()">
+                <nb-icon icon="plus-outline"></nb-icon>
+                添加功能
+              </button>
+            </div>
+          </div>
+        </nb-card-header>
+      </nb-card>
     </div>
 
     <!-- Categories Grid with Drag and Drop -->

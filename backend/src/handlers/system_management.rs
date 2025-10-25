@@ -1,13 +1,13 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
-    services::{cluster_service::ClusterService, starrocks_client::StarRocksClient},
+    services::starrocks_client::StarRocksClient,
     utils::error::{ApiError, ApiResult},
 };
 
@@ -16,22 +16,21 @@ pub struct SystemQueryParams {
     pub limit: Option<i32>,
     pub offset: Option<i32>,
     pub filter: Option<String>,
-    pub path: Option<String>,  // New: support nested paths
+    pub path: Option<String>, // New: support nested paths
 }
 
 /// Get system information list (all 25 system functions)
 #[utoipa::path(
     get,
-    path = "/api/clusters/{cluster_id}/system",
+    path = "/api/clusters/system",
     params(
-        ("cluster_id" = i64, Path, description = "Cluster ID"),
         ("limit" = Option<i32>, Query, description = "Limit results"),
         ("offset" = Option<i32>, Query, description = "Offset results"),
         ("filter" = Option<String>, Query, description = "Filter by name")
     ),
     responses(
         (status = 200, description = "System functions list", body = Vec<SystemFunction>),
-        (status = 404, description = "Cluster not found"),
+        (status = 404, description = "No active cluster found"),
         (status = 500, description = "Internal server error")
     ),
     security(
@@ -40,12 +39,10 @@ pub struct SystemQueryParams {
 )]
 pub async fn get_system_functions(
     State(state): State<Arc<crate::AppState>>,
-    Path(cluster_id): Path<i64>,
     Query(params): Query<SystemQueryParams>,
 ) -> ApiResult<impl IntoResponse> {
     // Get cluster info
-    let cluster_service = ClusterService::new(state.db.clone());
-    let cluster = cluster_service.get_cluster(cluster_id).await?;
+    let cluster = state.cluster_service.get_active_cluster().await?;
 
     // Create StarRocks client
     let client = StarRocksClient::new(cluster);
@@ -59,9 +56,8 @@ pub async fn get_system_functions(
 /// Get detailed information for a specific system function
 #[utoipa::path(
     get,
-    path = "/api/clusters/{cluster_id}/system/{function_name}",
+    path = "/api/clusters/system/{function_name}",
     params(
-        ("cluster_id" = i64, Path, description = "Cluster ID"),
         ("function_name" = String, Path, description = "System function name"),
         ("path" = Option<String>, Query, description = "Nested path for hierarchical navigation")
     ),
@@ -76,12 +72,11 @@ pub async fn get_system_functions(
 )]
 pub async fn get_system_function_detail(
     State(state): State<Arc<crate::AppState>>,
-    Path((cluster_id, function_name)): Path<(i64, String)>,
+    Path(function_name): Path<String>,
     Query(params): Query<SystemQueryParams>,
 ) -> ApiResult<impl IntoResponse> {
     // Get cluster info
-    let cluster_service = ClusterService::new(state.db.clone());
-    let cluster = cluster_service.get_cluster(cluster_id).await?;
+    let cluster = state.cluster_service.get_active_cluster().await?;
 
     // Create StarRocks client
     let client = StarRocksClient::new(cluster);
@@ -211,13 +206,6 @@ async fn get_all_system_functions(
             last_updated: chrono::Utc::now(),
         },
         SystemFunction {
-            name: "monitor".to_string(),
-            description: "System monitoring".to_string(),
-            category: "Monitor".to_string(),
-            status: "Active".to_string(),
-            last_updated: chrono::Utc::now(),
-        },
-        SystemFunction {
             name: "transactions".to_string(),
             description: "Transaction management".to_string(),
             category: "Transaction".to_string(),
@@ -290,10 +278,10 @@ async fn get_all_system_functions(
     // Apply pagination
     let offset = params.offset.unwrap_or(0) as usize;
     let limit = params.limit.unwrap_or(25) as usize;
-    
+
     let start = offset.min(functions.len());
     let end = (offset + limit).min(functions.len());
-    
+
     Ok(functions[start..end].to_vec())
 }
 
@@ -302,7 +290,7 @@ async fn get_function_details(
     proc_path: &str,
 ) -> ApiResult<SystemFunctionDetail> {
     let url = format!("{}/api/show_proc?path={}", client.get_base_url(), proc_path);
-    
+
     let response = client
         .http_client
         .get(&url)
@@ -329,10 +317,7 @@ async fn get_function_details(
             if let Some(obj) = item.as_object() {
                 let mut row_data = std::collections::HashMap::new();
                 for (key, value) in obj {
-                    row_data.insert(
-                        key.clone(),
-                        value.as_str().unwrap_or("").to_string(),
-                    );
+                    row_data.insert(key.clone(), value.as_str().unwrap_or("").to_string());
                 }
                 detail_data.push(row_data);
             }
@@ -340,8 +325,12 @@ async fn get_function_details(
     }
 
     // Extract function name from proc_path (e.g., "/brokers" -> "brokers")
-    let function_name = proc_path.trim_start_matches('/').split('/').next().unwrap_or("unknown");
-    
+    let function_name = proc_path
+        .trim_start_matches('/')
+        .split('/')
+        .next()
+        .unwrap_or("unknown");
+
     Ok(SystemFunctionDetail {
         function_name: function_name.to_string(),
         description: get_function_description(function_name),
@@ -366,7 +355,6 @@ fn get_function_description(function_name: &str) -> String {
         "warehouses" => "Compute warehouses for resource isolation".to_string(),
         "resources" => "Resource pools and allocation".to_string(),
         "statistic" => "Table and column statistics".to_string(),
-        "monitor" => "System monitoring metrics".to_string(),
         "cluster_balance" => "Cluster data balance status".to_string(),
         "load_error_hub" => "Data loading error information".to_string(),
         "meta_recovery" => "Metadata recovery status".to_string(),

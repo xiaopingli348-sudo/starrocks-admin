@@ -1,13 +1,11 @@
 use axum::{
-    extract::{Path, State},
     Json,
+    extract::{Path, State},
 };
 use std::sync::Arc;
 
 use crate::AppState;
-use crate::models::{
-    ClusterHealth, ClusterResponse, CreateClusterRequest, UpdateClusterRequest,
-};
+use crate::models::{ClusterHealth, ClusterResponse, CreateClusterRequest, UpdateClusterRequest};
 use crate::utils::ApiResult;
 use serde::Deserialize;
 
@@ -31,11 +29,15 @@ pub async fn create_cluster(
     Json(req): Json<CreateClusterRequest>,
 ) -> ApiResult<Json<ClusterResponse>> {
     tracing::info!("Cluster creation request: name={}, host={}", req.name, req.fe_host);
-    tracing::debug!("Cluster creation details: user_id={}, port={}, ssl={}", 
-                   user_id, req.fe_http_port, req.enable_ssl);
-    
+    tracing::debug!(
+        "Cluster creation details: user_id={}, port={}, ssl={}",
+        user_id,
+        req.fe_http_port,
+        req.enable_ssl
+    );
+
     let cluster = state.cluster_service.create_cluster(req, user_id).await?;
-    
+
     tracing::info!("Cluster created successfully: {} (ID: {})", cluster.name, cluster.id);
     Ok(Json(cluster.into()))
 }
@@ -56,12 +58,64 @@ pub async fn list_clusters(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<ClusterResponse>>> {
     tracing::debug!("Listing all clusters");
-    
+
     let clusters = state.cluster_service.list_clusters().await?;
     let responses: Vec<ClusterResponse> = clusters.into_iter().map(|c| c.into()).collect();
-    
+
     tracing::debug!("Retrieved {} clusters", responses.len());
     Ok(Json(responses))
+}
+
+// Get the currently active cluster
+#[utoipa::path(
+    get,
+    path = "/api/clusters/active",
+    responses(
+        (status = 200, description = "Active cluster details", body = ClusterResponse),
+        (status = 404, description = "No active cluster found")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Clusters"
+)]
+pub async fn get_active_cluster(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<ClusterResponse>> {
+    tracing::debug!("Getting active cluster");
+
+    let cluster = state.cluster_service.get_active_cluster().await?;
+
+    tracing::debug!("Active cluster: {} (ID: {})", cluster.name, cluster.id);
+    Ok(Json(cluster.into()))
+}
+
+// Set a cluster as active
+#[utoipa::path(
+    put,
+    path = "/api/clusters/{id}/activate",
+    params(
+        ("id" = i64, Path, description = "Cluster ID to activate")
+    ),
+    responses(
+        (status = 200, description = "Cluster activated successfully", body = ClusterResponse),
+        (status = 404, description = "Cluster not found")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Clusters"
+)]
+pub async fn activate_cluster(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<ClusterResponse>> {
+    tracing::info!("Activating cluster: ID {}", id);
+
+    let cluster = state.cluster_service.set_active_cluster(id).await?;
+
+    tracing::info!("Cluster activated successfully: {} (ID: {})", cluster.name, cluster.id);
+    Ok(Json(cluster.into()))
 }
 
 // Get cluster by ID
@@ -135,9 +189,9 @@ pub async fn delete_cluster(
     Path(id): Path<i64>,
 ) -> ApiResult<Json<serde_json::Value>> {
     tracing::warn!("Cluster deletion request for ID: {}", id);
-    
+
     state.cluster_service.delete_cluster(id).await?;
-    
+
     tracing::warn!("Cluster deleted successfully: ID {}", id);
     Ok(Json(serde_json::json!({"message": "Cluster deleted successfully"})))
 }
@@ -187,46 +241,55 @@ pub async fn get_cluster_health(
     body: Option<Json<HealthCheckRequest>>,
 ) -> ApiResult<Json<ClusterHealth>> {
     use crate::models::Cluster;
-    
+
     // Mode 1: If body provided with connection details, use them (new cluster mode)
     if let Some(Json(health_req)) = body
-        && health_req.fe_host.is_some() {
-            tracing::info!("Health check with provided credentials: host={}", 
-                         health_req.fe_host.as_ref().unwrap());
-            tracing::debug!("Health check details: port={}, ssl={}, catalog={}", 
-                          health_req.fe_http_port.unwrap_or(8030), 
-                          health_req.enable_ssl, 
-                          health_req.catalog.as_deref().unwrap_or("default_catalog"));
-            
-            let temp_cluster = Cluster {
-                id: 0,
-                name: "test".to_string(),
-                description: None,
-                fe_host: health_req.fe_host.unwrap(),
-                fe_http_port: health_req.fe_http_port.unwrap_or(8030),
-                fe_query_port: health_req.fe_query_port.unwrap_or(9030),
-                username: health_req.username.unwrap_or_else(|| "root".to_string()),
-                password_encrypted: health_req.password.unwrap_or_default(),
-                enable_ssl: health_req.enable_ssl,
-                connection_timeout: 10,
-                catalog: health_req.catalog.unwrap_or_else(|| "default_catalog".to_string()),
-                tags: None,
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-                created_by: None,
-            };
-            
-            let health = state.cluster_service.get_cluster_health_for_cluster(&temp_cluster, &state.mysql_pool_manager).await?;
-            return Ok(Json(health));
+        && health_req.fe_host.is_some()
+    {
+        tracing::info!(
+            "Health check with provided credentials: host={}",
+            health_req.fe_host.as_ref().unwrap()
+        );
+        tracing::debug!(
+            "Health check details: port={}, ssl={}, catalog={}",
+            health_req.fe_http_port.unwrap_or(8030),
+            health_req.enable_ssl,
+            health_req.catalog.as_deref().unwrap_or("default_catalog")
+        );
+
+        let temp_cluster = Cluster {
+            id: 0,
+            name: "test".to_string(),
+            description: None,
+            fe_host: health_req.fe_host.unwrap(),
+            fe_http_port: health_req.fe_http_port.unwrap_or(8030),
+            fe_query_port: health_req.fe_query_port.unwrap_or(9030),
+            username: health_req.username.unwrap_or_else(|| "root".to_string()),
+            password_encrypted: health_req.password.unwrap_or_default(),
+            enable_ssl: health_req.enable_ssl,
+            connection_timeout: 10,
+            catalog: health_req
+                .catalog
+                .unwrap_or_else(|| "default_catalog".to_string()),
+            is_active: false,
+            tags: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            created_by: None,
+        };
+
+        let health = state
+            .cluster_service
+            .get_cluster_health_for_cluster(&temp_cluster, &state.mysql_pool_manager)
+            .await?;
+        return Ok(Json(health));
     }
-    
+
     // Mode 2: Use cluster ID (existing cluster mode)
     tracing::info!("Health check for existing cluster ID: {}", id);
     let health = state.cluster_service.get_cluster_health(id).await?;
-    
-    tracing::debug!("Health check result: status={:?}, checks={:?}", 
-                   health.status, health.checks);
-    
+
+    tracing::debug!("Health check result: status={:?}, checks={:?}", health.status, health.checks);
+
     Ok(Json(health))
 }
-

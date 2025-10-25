@@ -8,7 +8,6 @@ import { BackendsComponent } from './backends/backends.component';
 import { FrontendsComponent } from './frontends/frontends.component';
 import { MaterializedViewsComponent } from './materialized-views/materialized-views.component';
 import { QueriesComponent } from './queries/queries.component';
-import { MonitorComponent } from './monitor/monitor.component';
 import { ClusterOverviewComponent } from './cluster-overview/cluster-overview.component';
 import { SessionsComponent } from './sessions/sessions.component';
 import { VariablesComponent } from './variables/variables.component';
@@ -76,10 +75,6 @@ const routes: Routes = [
   {
     path: 'overview',
     component: ClusterOverviewComponent,
-  },
-  {
-    path: 'monitor',
-    component: MonitorComponent, // Keep for backward compatibility, consider deprecating
   },
 ];
 

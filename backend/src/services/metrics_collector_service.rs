@@ -3,6 +3,7 @@
 // Design Ref: ARCHITECTURE_ANALYSIS_AND_INTEGRATION.md
 
 use crate::models::Cluster;
+use crate::services::mysql_pool_manager::MySQLPoolManager;
 use crate::services::{ClusterService, StarRocksClient};
 use crate::utils::{ApiResult, ScheduledTask};
 use chrono::Utc;
@@ -13,12 +14,34 @@ use std::pin::Pin;
 use std::sync::Arc;
 use utoipa::ToSchema;
 
+/// Aggregated metrics from database queries
+#[derive(Debug, sqlx::FromRow)]
+struct MetricsAggregation {
+    avg_qps: Option<f64>,
+    max_qps: Option<f64>,
+    min_qps: Option<f64>,
+    avg_latency_p99: Option<f64>,
+    max_latency_p99: Option<f64>,
+    total_queries: Option<i64>,
+    total_errors: Option<i64>,
+    avg_cpu_usage: Option<f64>,
+    max_cpu_usage: Option<f64>,
+    avg_memory_usage: Option<f64>,
+    max_memory_usage: Option<f64>,
+    avg_disk_usage_pct: Option<f64>,
+    max_disk_usage_pct: Option<f64>,
+    #[allow(dead_code)]
+    avg_disk_used_bytes: Option<i64>,
+    #[allow(dead_code)]
+    max_disk_used_bytes: Option<i64>,
+}
+
 /// Metrics snapshot stored in database
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct MetricsSnapshot {
     pub cluster_id: i64,
     pub collected_at: chrono::DateTime<Utc>,
-    
+
     // Query performance
     pub qps: f64,
     pub rps: f64,
@@ -29,13 +52,13 @@ pub struct MetricsSnapshot {
     pub query_success: i64,
     pub query_error: i64,
     pub query_timeout: i64,
-    
+
     // Cluster health
     pub backend_total: i32,
     pub backend_alive: i32,
     pub frontend_total: i32,
     pub frontend_alive: i32,
-    
+
     // Resource usage
     pub total_cpu_usage: f64,
     pub avg_cpu_usage: f64,
@@ -44,32 +67,32 @@ pub struct MetricsSnapshot {
     pub disk_total_bytes: i64,
     pub disk_used_bytes: i64,
     pub disk_usage_pct: f64,
-    
+
     // Storage
     pub tablet_count: i64,
     pub max_compaction_score: f64,
-    
+
     // Transactions
     pub txn_running: i32,
     pub txn_success_total: i64,
     pub txn_failed_total: i64,
-    
+
     // Load jobs
     pub load_running: i32,
     pub load_finished_total: i64,
-    
+
     // JVM metrics
     pub jvm_heap_total: i64,
     pub jvm_heap_used: i64,
     pub jvm_heap_usage_pct: f64,
     pub jvm_thread_count: i32,
-    
+
     // Network metrics
     pub network_bytes_sent_total: i64,
     pub network_bytes_received_total: i64,
     pub network_send_rate: f64,
     pub network_receive_rate: f64,
-    
+
     // IO metrics
     pub io_read_bytes_total: i64,
     pub io_write_bytes_total: i64,
@@ -78,18 +101,25 @@ pub struct MetricsSnapshot {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct MetricsCollectorService {
     db: SqlitePool,
     cluster_service: Arc<ClusterService>,
+    mysql_pool_manager: Arc<MySQLPoolManager>,
     retention_days: i64,
 }
 
 impl MetricsCollectorService {
     /// Create a new MetricsCollectorService
-    pub fn new(db: SqlitePool, cluster_service: Arc<ClusterService>) -> Self {
+    pub fn new(
+        db: SqlitePool,
+        cluster_service: Arc<ClusterService>,
+        mysql_pool_manager: Arc<MySQLPoolManager>,
+    ) -> Self {
         Self {
             db,
             cluster_service,
+            mysql_pool_manager,
             retention_days: 7, // 7 days retention
         }
     }
@@ -99,10 +129,10 @@ impl MetricsCollectorService {
     pub async fn collect_once(&self) -> Result<(), anyhow::Error> {
         // Collect metrics from all clusters
         self.collect_all_clusters().await?;
-        
+
         // Check if we need to run daily aggregation
         self.check_and_run_daily_aggregation().await?;
-        
+
         Ok(())
     }
 
@@ -111,29 +141,28 @@ impl MetricsCollectorService {
         // Check if we've already aggregated today
         let today = Utc::now().date_naive();
         let yesterday = today - chrono::Duration::days(1);
-        
+
         // Check if yesterday's data has been aggregated
-        let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) as count FROM daily_snapshots WHERE snapshot_date = ?"
-        )
-        .bind(yesterday)
-        .fetch_one(&self.db)
-        .await?;
-        
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) as count FROM daily_snapshots WHERE snapshot_date = ?")
+                .bind(yesterday)
+                .fetch_one(&self.db)
+                .await?;
+
         if count.0 == 0 {
             tracing::info!("Running daily aggregation for date: {}", yesterday);
             self.run_daily_aggregation_all_clusters().await?;
         }
-        
+
         Ok(())
     }
 
     /// Collect metrics from all clusters
     async fn collect_all_clusters(&self) -> Result<(), anyhow::Error> {
         let clusters = self.cluster_service.list_clusters().await?;
-        
+
         tracing::debug!("Collecting metrics from {} clusters", clusters.len());
-        
+
         for cluster in clusters {
             if let Err(e) = self.collect_cluster_metrics(&cluster).await {
                 tracing::error!(
@@ -145,21 +174,21 @@ impl MetricsCollectorService {
                 // Continue with other clusters
             }
         }
-        
+
         // Cleanup old metrics every collection cycle
         if let Err(e) = self.cleanup_old_metrics().await {
             tracing::error!("Failed to cleanup old metrics: {}", e);
         }
-        
+
         Ok(())
     }
 
     /// Collect metrics from a single cluster
     async fn collect_cluster_metrics(&self, cluster: &Cluster) -> ApiResult<()> {
         tracing::debug!("Collecting metrics for cluster: {} ({})", cluster.id, cluster.name);
-        
+
         let client = StarRocksClient::new(cluster.clone());
-        
+
         // Collect data from StarRocks
         let (metrics_text, backends, frontends, runtime_info) = tokio::try_join!(
             client.get_metrics(),
@@ -167,60 +196,102 @@ impl MetricsCollectorService {
             client.get_frontends(),
             client.get_runtime_info(),
         )?;
-        
+
         // Parse Prometheus metrics
         let metrics_map = client.parse_prometheus_metrics(&metrics_text)?;
-        
+
         // Aggregate backend metrics
         let backend_total = backends.len() as i32;
         let backend_alive = backends.iter().filter(|b| b.alive == "true").count() as i32;
-        
+
         let frontend_total = frontends.len() as i32;
         let frontend_alive = frontends.iter().filter(|f| f.alive == "true").count() as i32;
-        
+
         let tablet_count: i64 = backends
             .iter()
             .filter_map(|b| b.tablet_num.parse::<i64>().ok())
             .sum();
-        
-        let total_cpu_usage: f64 = backends
+
+        let cpu_values: Vec<f64> = backends
             .iter()
-            .filter_map(|b| b.cpu_used_pct.trim_end_matches('%').parse::<f64>().ok())
-            .sum();
-        
-        let avg_cpu_usage = if backend_total > 0 {
-            total_cpu_usage / backend_total as f64
+            .filter_map(|b| {
+                let trimmed = b.cpu_used_pct.trim().trim_end_matches('%').trim();
+                match trimmed.parse::<f64>() {
+                    Ok(v) => Some(v),
+                    Err(_e) => {
+                        tracing::warn!(
+                            "Failed to parse CPU: '{}' from '{}'",
+                            trimmed,
+                            b.cpu_used_pct
+                        );
+                        None
+                    },
+                }
+            })
+            .collect();
+
+        let total_cpu_usage: f64 = cpu_values.iter().sum();
+
+        let avg_cpu_usage = if backend_total > 0 && !cpu_values.is_empty() {
+            total_cpu_usage / cpu_values.len() as f64
         } else {
             0.0
         };
-        
+
+        tracing::debug!(
+            "CPU parsing: parsed {}/{} backends, total={}, avg={}",
+            cpu_values.len(),
+            backend_total,
+            total_cpu_usage,
+            avg_cpu_usage
+        );
+
         let total_memory_usage: f64 = backends
             .iter()
-            .filter_map(|b| b.mem_used_pct.trim_end_matches('%').parse::<f64>().ok())
+            .filter_map(|b| {
+                b.mem_used_pct
+                    .trim()
+                    .trim_end_matches('%')
+                    .trim()
+                    .parse::<f64>()
+                    .ok()
+            })
             .sum();
-        
-        let avg_memory_usage = if backend_total > 0 {
-            total_memory_usage / backend_total as f64
-        } else {
-            0.0
-        };
-        
-        let disk_used_bytes: i64 = backends
-            .iter()
-            .filter_map(|b| parse_storage_size(&b.data_used_capacity))
-            .sum();
-        
+
+        let avg_memory_usage =
+            if backend_total > 0 { total_memory_usage / backend_total as f64 } else { 0.0 };
+
+        // Calculate disk total capacity (sum of all BE nodes)
         let disk_total_bytes: i64 = backends
             .iter()
             .filter_map(|b| parse_storage_size(&b.total_capacity))
             .sum();
-        
-        let disk_usage_pct = if disk_total_bytes > 0 {
-            (disk_used_bytes as f64 / disk_total_bytes as f64) * 100.0
-        } else {
-            0.0
-        };
-        
+
+        // For local cache usage: find the BE node with MAX disk usage percentage
+        // and calculate its actual used bytes (this represents cache pressure)
+        let (max_disk_usage_pct, _max_node_total, max_node_used) = backends
+            .iter()
+            .filter_map(|b| {
+                let pct_str = b.max_disk_used_pct.trim().trim_end_matches('%').trim();
+                let pct = pct_str.parse::<f64>().ok()?;
+                let total = parse_storage_size(&b.total_capacity)?;
+                let used = (total as f64 * pct / 100.0) as i64;
+                Some((pct, total, used))
+            })
+            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or((0.0, 0, 0));
+
+        // Use the max node's used bytes as disk_used_bytes (represents local cache usage)
+        let disk_used_bytes = max_node_used;
+        let disk_usage_pct = max_disk_usage_pct;
+
+        tracing::debug!(
+            "Local cache usage (MAX node): {}% ({} bytes), total BE capacity: {} bytes",
+            disk_usage_pct,
+            disk_used_bytes,
+            disk_total_bytes
+        );
+
         // JVM metrics
         let jvm_heap_used = runtime_info.total_mem - runtime_info.free_mem;
         let jvm_heap_usage_pct = if runtime_info.total_mem > 0 {
@@ -228,41 +299,104 @@ impl MetricsCollectorService {
         } else {
             0.0
         };
-        
+
         // Network metrics (BE)
-        let network_bytes_sent_total = metrics_map.get("starrocks_be_network_send_bytes").copied().unwrap_or(0.0) as i64;
-        let network_bytes_received_total = metrics_map.get("starrocks_be_network_receive_bytes").copied().unwrap_or(0.0) as i64;
-        let network_send_rate = metrics_map.get("starrocks_be_network_send_rate").copied().unwrap_or(0.0);
-        let network_receive_rate = metrics_map.get("starrocks_be_network_receive_rate").copied().unwrap_or(0.0);
-        
+        let network_bytes_sent_total = metrics_map
+            .get("starrocks_be_network_send_bytes")
+            .copied()
+            .unwrap_or(0.0) as i64;
+        let network_bytes_received_total = metrics_map
+            .get("starrocks_be_network_receive_bytes")
+            .copied()
+            .unwrap_or(0.0) as i64;
+        let network_send_rate = metrics_map
+            .get("starrocks_be_network_send_rate")
+            .copied()
+            .unwrap_or(0.0);
+        let network_receive_rate = metrics_map
+            .get("starrocks_be_network_receive_rate")
+            .copied()
+            .unwrap_or(0.0);
+
         // IO metrics (BE)
-        let io_read_bytes_total = metrics_map.get("starrocks_be_disk_read_bytes").copied().unwrap_or(0.0) as i64;
-        let io_write_bytes_total = metrics_map.get("starrocks_be_disk_write_bytes").copied().unwrap_or(0.0) as i64;
-        let io_read_rate = metrics_map.get("starrocks_be_disk_read_rate").copied().unwrap_or(0.0);
-        let io_write_rate = metrics_map.get("starrocks_be_disk_write_rate").copied().unwrap_or(0.0);
-        
+        let io_read_bytes_total = metrics_map
+            .get("starrocks_be_disk_read_bytes")
+            .copied()
+            .unwrap_or(0.0) as i64;
+        let io_write_bytes_total = metrics_map
+            .get("starrocks_be_disk_write_bytes")
+            .copied()
+            .unwrap_or(0.0) as i64;
+        let io_read_rate = metrics_map
+            .get("starrocks_be_disk_read_rate")
+            .copied()
+            .unwrap_or(0.0);
+        let io_write_rate = metrics_map
+            .get("starrocks_be_disk_write_rate")
+            .copied()
+            .unwrap_or(0.0);
+
+        // Get real latency percentiles from audit logs using StarRocks percentile functions
+        let (real_p50, real_p95, real_p99) = self
+            .get_real_latency_percentiles(cluster)
+            .await
+            .unwrap_or((0.0, 0.0, 0.0));
+
         // Create snapshot
         let snapshot = MetricsSnapshot {
             cluster_id: cluster.id,
             collected_at: Utc::now(),
-            
-            // Query metrics from Prometheus
+
+            // Query metrics: Use real percentiles from audit logs, fallback to Prometheus
             qps: metrics_map.get("starrocks_fe_qps").copied().unwrap_or(0.0),
             rps: metrics_map.get("starrocks_fe_rps").copied().unwrap_or(0.0),
-            query_latency_p50: metrics_map.get("starrocks_fe_query_latency_p50").copied().unwrap_or(0.0),
-            query_latency_p95: metrics_map.get("starrocks_fe_query_latency_p95").copied().unwrap_or(0.0),
-            query_latency_p99: metrics_map.get("starrocks_fe_query_latency_p99").copied().unwrap_or(0.0),
-            query_total: metrics_map.get("starrocks_fe_query_total").copied().unwrap_or(0.0) as i64,
-            query_success: metrics_map.get("starrocks_fe_query_success").copied().unwrap_or(0.0) as i64,
-            query_error: metrics_map.get("starrocks_fe_query_err").copied().unwrap_or(0.0) as i64,
-            query_timeout: metrics_map.get("starrocks_fe_query_timeout").copied().unwrap_or(0.0) as i64,
-            
+            query_latency_p50: if real_p50 > 0.0 {
+                real_p50
+            } else {
+                metrics_map
+                    .get("starrocks_fe_query_latency_p50")
+                    .copied()
+                    .unwrap_or(0.0)
+            },
+            query_latency_p95: if real_p95 > 0.0 {
+                real_p95
+            } else {
+                metrics_map
+                    .get("starrocks_fe_query_latency_p95")
+                    .copied()
+                    .unwrap_or(0.0)
+            },
+            query_latency_p99: if real_p99 > 0.0 {
+                real_p99
+            } else {
+                metrics_map
+                    .get("starrocks_fe_query_latency_p99")
+                    .copied()
+                    .unwrap_or(0.0)
+            },
+            query_total: metrics_map
+                .get("starrocks_fe_query_total")
+                .copied()
+                .unwrap_or(0.0) as i64,
+            query_success: metrics_map
+                .get("starrocks_fe_query_success")
+                .copied()
+                .unwrap_or(0.0) as i64,
+            query_error: metrics_map
+                .get("starrocks_fe_query_err")
+                .copied()
+                .unwrap_or(0.0) as i64,
+            query_timeout: metrics_map
+                .get("starrocks_fe_query_timeout")
+                .copied()
+                .unwrap_or(0.0) as i64,
+
             // Cluster health
             backend_total,
             backend_alive,
             frontend_total,
             frontend_alive,
-            
+
             // Resource usage
             total_cpu_usage,
             avg_cpu_usage,
@@ -271,45 +405,54 @@ impl MetricsCollectorService {
             disk_total_bytes,
             disk_used_bytes,
             disk_usage_pct,
-            
+
             // Storage
             tablet_count,
             max_compaction_score: metrics_map
                 .get("starrocks_fe_max_tablet_compaction_score")
                 .copied()
                 .unwrap_or(0.0),
-            
+
             // Transactions
             txn_running: 0, // TODO: Need to get from appropriate metric
-            txn_success_total: metrics_map.get("starrocks_fe_txn_success").copied().unwrap_or(0.0) as i64,
-            txn_failed_total: metrics_map.get("starrocks_fe_txn_failed").copied().unwrap_or(0.0) as i64,
-            
+            txn_success_total: metrics_map
+                .get("starrocks_fe_txn_success")
+                .copied()
+                .unwrap_or(0.0) as i64,
+            txn_failed_total: metrics_map
+                .get("starrocks_fe_txn_failed")
+                .copied()
+                .unwrap_or(0.0) as i64,
+
             // Load jobs
             load_running: 0, // TODO: Need to get from appropriate metric
-            load_finished_total: metrics_map.get("starrocks_fe_load_finished").copied().unwrap_or(0.0) as i64,
-            
+            load_finished_total: metrics_map
+                .get("starrocks_fe_load_finished")
+                .copied()
+                .unwrap_or(0.0) as i64,
+
             // JVM metrics
             jvm_heap_total: runtime_info.total_mem,
             jvm_heap_used,
             jvm_heap_usage_pct,
             jvm_thread_count: runtime_info.thread_cnt,
-            
+
             // Network metrics
             network_bytes_sent_total,
             network_bytes_received_total,
             network_send_rate,
             network_receive_rate,
-            
+
             // IO metrics
             io_read_bytes_total,
             io_write_bytes_total,
             io_read_rate,
             io_write_rate,
         };
-        
+
         // Save to database
         self.save_snapshot(&snapshot).await?;
-        
+
         tracing::debug!(
             "Metrics collected for cluster {} ({}): QPS={:.2}, CPU={:.1}%, Disk={:.1}%",
             cluster.id,
@@ -318,7 +461,7 @@ impl MetricsCollectorService {
             snapshot.avg_cpu_usage,
             snapshot.disk_usage_pct
         );
-        
+
         Ok(())
     }
 
@@ -349,6 +492,8 @@ impl MetricsCollectorService {
                 ?, ?,
                 ?, ?, ?,
                 ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?, ?
@@ -398,21 +543,19 @@ impl MetricsCollectorService {
         .bind(snapshot.io_write_rate)
         .execute(&self.db)
         .await?;
-        
+
         Ok(())
     }
 
     /// Cleanup old metrics data based on retention policy
     async fn cleanup_old_metrics(&self) -> Result<(), sqlx::Error> {
         let cutoff_date = Utc::now() - chrono::Duration::days(self.retention_days);
-        
-        let result = sqlx::query(
-            "DELETE FROM metrics_snapshots WHERE collected_at < ?"
-        )
-        .bind(cutoff_date)
-        .execute(&self.db)
-        .await?;
-        
+
+        let result = sqlx::query("DELETE FROM metrics_snapshots WHERE collected_at < ?")
+            .bind(cutoff_date)
+            .execute(&self.db)
+            .await?;
+
         if result.rows_affected() > 0 {
             tracing::info!(
                 "Cleaned up {} old metric snapshots (older than {} days)",
@@ -420,7 +563,7 @@ impl MetricsCollectorService {
                 self.retention_days
             );
         }
-        
+
         Ok(())
     }
 
@@ -477,12 +620,12 @@ impl MetricsCollectorService {
             WHERE cluster_id = ?
             ORDER BY collected_at DESC
             LIMIT 1
-            "#
+            "#,
         )
         .bind(cluster_id)
         .fetch_optional(&self.db)
         .await?;
-        
+
         if let Some(r) = row {
             Ok(Some(MetricsSnapshot {
                 cluster_id: r.cluster_id,
@@ -560,9 +703,9 @@ impl MetricsCollectorService {
     /// Run daily aggregation for all clusters
     async fn run_daily_aggregation_all_clusters(&self) -> Result<(), anyhow::Error> {
         let clusters = self.cluster_service.list_clusters().await?;
-        
+
         tracing::info!("Starting daily aggregation for {} clusters", clusters.len());
-        
+
         for cluster in clusters {
             if let Err(e) = self.run_daily_aggregation_for_cluster(cluster.id).await {
                 tracing::error!(
@@ -573,10 +716,10 @@ impl MetricsCollectorService {
                 );
             }
         }
-        
+
         // Cleanup old daily snapshots (keep 90 days)
         self.cleanup_old_daily_snapshots().await?;
-        
+
         Ok(())
     }
 
@@ -586,16 +729,16 @@ impl MetricsCollectorService {
         let yesterday = Utc::now().date_naive() - chrono::Duration::days(1);
         let yesterday_start = yesterday.and_hms_opt(0, 0, 0).unwrap().and_utc();
         let yesterday_end = yesterday.and_hms_opt(23, 59, 59).unwrap().and_utc();
-        
+
         tracing::debug!(
             "Aggregating metrics for cluster {} from {} to {}",
             cluster_id,
             yesterday_start,
             yesterday_end
         );
-        
+
         // Query all snapshots from yesterday
-        let snapshots: (Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<i64>, Option<i64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<i64>) = sqlx::query_as(
+        let snapshots = sqlx::query_as::<_, MetricsAggregation>(
             r#"
             SELECT
                 AVG(qps) as avg_qps,
@@ -617,38 +760,38 @@ impl MetricsCollectorService {
             WHERE cluster_id = ?
                 AND collected_at >= ?
                 AND collected_at <= ?
-            "#
+            "#,
         )
         .bind(cluster_id)
         .bind(yesterday_start)
         .bind(yesterday_end)
         .fetch_one(&self.db)
         .await?;
-        
+
         // Calculate derived metrics
-        let total_queries = snapshots.5.unwrap_or(0);
-        let total_errors = snapshots.6.unwrap_or(0);
+        let total_queries = snapshots.total_queries.unwrap_or(0);
+        let total_errors = snapshots.total_errors.unwrap_or(0);
         let error_rate = if total_queries > 0 {
             (total_errors as f64 / total_queries as f64) * 100.0
         } else {
             0.0
         };
-        
+
         // Prepare values (to avoid temporary value lifetime issues)
-        let avg_qps = snapshots.0.unwrap_or(0.0);
-        let max_qps = snapshots.1.unwrap_or(0.0);
-        let min_qps = snapshots.2.unwrap_or(0.0);
-        let avg_latency_p99 = snapshots.3.unwrap_or(0.0);
-        let max_latency_p99 = snapshots.4.unwrap_or(0.0);
-        let avg_cpu_usage = snapshots.7.unwrap_or(0.0);
-        let max_cpu_usage = snapshots.8.unwrap_or(0.0);
-        let avg_memory_usage = snapshots.9.unwrap_or(0.0);
-        let max_memory_usage = snapshots.10.unwrap_or(0.0);
-        let avg_disk_usage_pct = snapshots.11.unwrap_or(0.0);
-        let max_disk_usage_pct = snapshots.12.unwrap_or(0.0);
-        let data_size_end = snapshots.13.unwrap_or(0.0) as i64;
+        let avg_qps = snapshots.avg_qps.unwrap_or(0.0);
+        let max_qps = snapshots.max_qps.unwrap_or(0.0);
+        let min_qps = snapshots.min_qps.unwrap_or(0.0);
+        let avg_latency_p99 = snapshots.avg_latency_p99.unwrap_or(0.0);
+        let max_latency_p99 = snapshots.max_latency_p99.unwrap_or(0.0);
+        let avg_cpu_usage = snapshots.avg_cpu_usage.unwrap_or(0.0);
+        let max_cpu_usage = snapshots.max_cpu_usage.unwrap_or(0.0);
+        let avg_memory_usage = snapshots.avg_memory_usage.unwrap_or(0.0);
+        let max_memory_usage = snapshots.max_memory_usage.unwrap_or(0.0);
+        let avg_disk_usage_pct = snapshots.avg_disk_usage_pct.unwrap_or(0.0);
+        let max_disk_usage_pct = snapshots.max_disk_usage_pct.unwrap_or(0.0);
+        let data_size_end = snapshots.max_disk_used_bytes.unwrap_or(0) as i64;
         let data_growth_bytes = 0i64; // Would need previous day's value
-        
+
         // Insert or update daily snapshot
         sqlx::query(
             r#"
@@ -679,7 +822,7 @@ impl MetricsCollectorService {
                 max_disk_usage_pct = excluded.max_disk_usage_pct,
                 data_size_end = excluded.data_size_end,
                 data_growth_bytes = excluded.data_growth_bytes
-            "#
+            "#,
         )
         .bind(cluster_id)
         .bind(yesterday)
@@ -701,34 +844,115 @@ impl MetricsCollectorService {
         .bind(data_growth_bytes)
         .execute(&self.db)
         .await?;
-        
+
         tracing::info!(
             "Daily aggregation completed for cluster {} (date: {})",
             cluster_id,
             yesterday
         );
-        
+
         Ok(())
+    }
+
+    /// Get real latency percentiles from audit logs using StarRocks percentile functions
+    /// Reference: https://docs.starrocks.io/zh/docs/category/percentile/
+    async fn get_real_latency_percentiles(&self, cluster: &Cluster) -> ApiResult<(f64, f64, f64)> {
+        use crate::services::mysql_client::MySQLClient;
+
+        // Get MySQL connection pool and create client
+        let pool = self.mysql_pool_manager.get_pool(cluster).await?;
+        let mysql_client = MySQLClient::from_pool(pool);
+
+        // Use StarRocks percentile_approx function to calculate P50, P95, P99 from audit logs
+        // Query recent 3 days of data for comprehensive percentiles
+        let query = r#"
+            SELECT 
+                COALESCE(percentile_approx(queryTime, 0.50), 0) as p50,
+                COALESCE(percentile_approx(queryTime, 0.95), 0) as p95,
+                COALESCE(percentile_approx(queryTime, 0.99), 0) as p99
+            FROM starrocks_audit_db__.starrocks_audit_tbl__
+            WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 3 DAY)
+                AND queryTime > 0
+                AND state = 'EOF'
+                AND isQuery = 1
+        "#;
+
+        match mysql_client.query(query).await {
+            Ok(results) => {
+                if let Some(row) = results.first() {
+                    // Parse percentile values - percentile_approx returns DOUBLE, so try f64 first
+                    let p50 = row
+                        .get("p50")
+                        .and_then(|v| v.as_f64())
+                        .or_else(|| row.get("p50").and_then(|v| v.as_i64()).map(|i| i as f64))
+                        .or_else(|| {
+                            row.get("p50")
+                                .and_then(|v| v.as_str())
+                                .and_then(|s| s.parse::<f64>().ok())
+                        })
+                        .unwrap_or(0.0);
+
+                    let p95 = row
+                        .get("p95")
+                        .and_then(|v| v.as_f64())
+                        .or_else(|| row.get("p95").and_then(|v| v.as_i64()).map(|i| i as f64))
+                        .or_else(|| {
+                            row.get("p95")
+                                .and_then(|v| v.as_str())
+                                .and_then(|s| s.parse::<f64>().ok())
+                        })
+                        .unwrap_or(0.0);
+
+                    let p99 = row
+                        .get("p99")
+                        .and_then(|v| v.as_f64())
+                        .or_else(|| row.get("p99").and_then(|v| v.as_i64()).map(|i| i as f64))
+                        .or_else(|| {
+                            row.get("p99")
+                                .and_then(|v| v.as_str())
+                                .and_then(|s| s.parse::<f64>().ok())
+                        })
+                        .unwrap_or(0.0);
+
+                    tracing::debug!(
+                        "Real latency percentiles from audit logs: P50={:.2}ms, P95={:.2}ms, P99={:.2}ms",
+                        p50,
+                        p95,
+                        p99
+                    );
+
+                    Ok((p50, p95, p99))
+                } else {
+                    tracing::debug!("No audit log data available for percentile calculation");
+                    Ok((0.0, 0.0, 0.0))
+                }
+            },
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to query audit logs for percentiles: {}. Falling back to Prometheus metrics.",
+                    e
+                );
+                Ok((0.0, 0.0, 0.0)) // Return zeros to fallback to Prometheus
+            },
+        }
     }
 
     /// Cleanup old daily snapshots (keep 90 days)
     async fn cleanup_old_daily_snapshots(&self) -> Result<(), sqlx::Error> {
         let cutoff_date = Utc::now().date_naive() - chrono::Duration::days(90);
-        
-        let result = sqlx::query(
-            "DELETE FROM daily_snapshots WHERE snapshot_date < ?"
-        )
-        .bind(cutoff_date)
-        .execute(&self.db)
-        .await?;
-        
+
+        let result = sqlx::query("DELETE FROM daily_snapshots WHERE snapshot_date < ?")
+            .bind(cutoff_date)
+            .execute(&self.db)
+            .await?;
+
         if result.rows_affected() > 0 {
             tracing::info!(
                 "Cleaned up {} old daily snapshots (older than 90 days)",
                 result.rows_affected()
             );
         }
-        
+
         Ok(())
     }
 }
@@ -743,4 +967,3 @@ impl ScheduledTask for MetricsCollectorService {
         "metrics-collector"
     }
 }
-

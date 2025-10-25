@@ -5,8 +5,8 @@
 use chrono::Utc;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -27,6 +27,22 @@ pub trait ScheduledTask: Send + Sync + 'static {
     fn name(&self) -> &str;
 }
 
+/// Blanket implementation for Arc<T> where T: ScheduledTask
+/// This allows passing Arc-wrapped tasks directly to the executor
+impl<T: ScheduledTask> ScheduledTask for Arc<T> {
+    fn run(&self) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send + '_>> {
+        (**self).run()
+    }
+
+    fn should_terminate(&self) -> bool {
+        (**self).should_terminate()
+    }
+
+    fn name(&self) -> &str {
+        (**self).name()
+    }
+}
+
 /// Scheduled executor for running periodic tasks
 pub struct ScheduledExecutor {
     interval: Duration,
@@ -41,18 +57,12 @@ impl ScheduledExecutor {
     /// * `task_name` - Name of the task (for logging)
     /// * `interval` - Interval between executions
     pub fn new(task_name: impl Into<String>, interval: Duration) -> Self {
-        Self {
-            task_name: task_name.into(),
-            interval,
-            shutdown: Arc::new(AtomicBool::new(false)),
-        }
+        Self { task_name: task_name.into(), interval, shutdown: Arc::new(AtomicBool::new(false)) }
     }
 
     /// Get a handle to trigger shutdown
     pub fn shutdown_handle(&self) -> ScheduledExecutorHandle {
-        ScheduledExecutorHandle {
-            shutdown: self.shutdown.clone(),
-        }
+        ScheduledExecutorHandle { shutdown: self.shutdown.clone() }
     }
 
     /// Start the scheduled task
@@ -67,7 +77,7 @@ impl ScheduledExecutor {
     /// let executor = ScheduledExecutor::new("my-task", Duration::from_secs(30));
     /// let handle = executor.shutdown_handle();
     /// executor.start(my_task).await;
-    /// 
+    ///
     /// // Later, to stop:
     /// handle.shutdown();
     /// ```
@@ -104,11 +114,11 @@ impl ScheduledExecutor {
                 match task.run().await {
                     Ok(()) => {
                         tracing::debug!("Scheduled task '{}' completed successfully", task_name);
-                    }
+                    },
                     Err(e) => {
                         // Log error but don't stop the scheduler
                         tracing::error!("Scheduled task '{}' failed: {}", task_name, e);
-                    }
+                    },
                 }
 
                 // Calculate next execution time (avoid cumulative drift)
@@ -216,9 +226,7 @@ mod tests {
     }
 
     impl ScheduledTask for TestTask {
-        fn run(
-            &self,
-        ) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send + '_>> {
+        fn run(&self) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send + '_>> {
             Box::pin(async move {
                 let count = self.counter.fetch_add(1, Ordering::Relaxed);
                 tracing::info!("TestTask run #{}", count + 1);
@@ -238,10 +246,7 @@ mod tests {
     #[tokio::test]
     async fn test_scheduled_executor() {
         let counter = Arc::new(AtomicU32::new(0));
-        let task = TestTask {
-            counter: counter.clone(),
-            max_runs: 3,
-        };
+        let task = TestTask { counter: counter.clone(), max_runs: 3 };
 
         let executor = ScheduledExecutor::new("test", Duration::from_millis(100));
         executor.start(task).await;
@@ -278,4 +283,3 @@ mod tests {
         assert!(final_count > 0 && final_count < 1000);
     }
 }
-

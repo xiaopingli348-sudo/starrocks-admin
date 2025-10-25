@@ -1,8 +1,8 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::{
     models::starrocks::{UpdateVariableRequest, Variable},
-    services::{cluster_service::ClusterService, mysql_client::MySQLClient},
+    services::mysql_client::MySQLClient,
     utils::error::{ApiError, ApiResult},
 };
 
@@ -28,15 +28,14 @@ fn default_type() -> String {
 /// Get system variables
 #[utoipa::path(
     get,
-    path = "/api/clusters/{cluster_id}/variables",
+    path = "/api/clusters/variables",
     params(
-        ("cluster_id" = i64, Path, description = "Cluster ID"),
         ("type" = Option<String>, Query, description = "Variable type: global or session"),
         ("filter" = Option<String>, Query, description = "Filter variable name")
     ),
     responses(
         (status = 200, description = "Variables list", body = Vec<Variable>),
-        (status = 404, description = "Cluster not found"),
+        (status = 404, description = "No active cluster found"),
         (status = 500, description = "Internal server error")
     ),
     security(
@@ -45,12 +44,10 @@ fn default_type() -> String {
 )]
 pub async fn get_variables(
     State(state): State<Arc<crate::AppState>>,
-    Path(cluster_id): Path<i64>,
     Query(params): Query<VariableQueryParams>,
 ) -> ApiResult<impl IntoResponse> {
     // Get cluster info
-    let cluster_service = ClusterService::new(state.db.clone());
-    let cluster = cluster_service.get_cluster(cluster_id).await?;
+    let cluster = state.cluster_service.get_active_cluster().await?;
 
     // Get MySQL client from pool
     let pool = state.mysql_pool_manager.get_pool(&cluster).await?;
@@ -74,11 +71,9 @@ pub async fn get_variables(
     // Parse results
     let variables: Vec<Variable> = rows
         .into_iter()
-        .map(|row| {
-            Variable {
-                name: row.first().cloned().unwrap_or_default(),
-                value: row.get(1).cloned().unwrap_or_default(),
-            }
+        .map(|row| Variable {
+            name: row.first().cloned().unwrap_or_default(),
+            value: row.get(1).cloned().unwrap_or_default(),
         })
         .collect();
 
@@ -88,15 +83,14 @@ pub async fn get_variables(
 /// Update a variable
 #[utoipa::path(
     put,
-    path = "/api/clusters/{cluster_id}/variables/{variable_name}",
+    path = "/api/clusters/variables/{variable_name}",
     params(
-        ("cluster_id" = i64, Path, description = "Cluster ID"),
         ("variable_name" = String, Path, description = "Variable name")
     ),
     request_body = UpdateVariableRequest,
     responses(
         (status = 200, description = "Variable updated successfully"),
-        (status = 404, description = "Cluster not found"),
+        (status = 404, description = "No active cluster found"),
         (status = 500, description = "Internal server error")
     ),
     security(
@@ -105,12 +99,11 @@ pub async fn get_variables(
 )]
 pub async fn update_variable(
     State(state): State<Arc<crate::AppState>>,
-    Path((cluster_id, variable_name)): Path<(i64, String)>,
+    Path(variable_name): Path<String>,
     Json(request): Json<UpdateVariableRequest>,
 ) -> ApiResult<impl IntoResponse> {
     // Get cluster info
-    let cluster_service = ClusterService::new(state.db.clone());
-    let cluster = cluster_service.get_cluster(cluster_id).await?;
+    let cluster = state.cluster_service.get_active_cluster().await?;
 
     // Get MySQL client from pool
     let pool = state.mysql_pool_manager.get_pool(&cluster).await?;
@@ -120,24 +113,14 @@ pub async fn update_variable(
     let scope = match request.scope.to_uppercase().as_str() {
         "GLOBAL" => "GLOBAL",
         "SESSION" => "SESSION",
-        _ => {
-            return Err(ApiError::invalid_data(
-                "Invalid scope. Must be GLOBAL or SESSION",
-            ))
-        }
+        _ => return Err(ApiError::invalid_data("Invalid scope. Must be GLOBAL or SESSION")),
     };
 
     // Build SET command
-    let sql = format!(
-        "SET {} {} = {}",
-        scope, variable_name, request.value
-    );
+    let sql = format!("SET {} {} = {}", scope, variable_name, request.value);
 
     // Execute command
     mysql_client.execute(&sql).await?;
 
-    Ok((
-        StatusCode::OK,
-        Json(json!({ "message": "Variable updated successfully" })),
-    ))
+    Ok((StatusCode::OK, Json(json!({ "message": "Variable updated successfully" }))))
 }

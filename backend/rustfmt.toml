@@ -2,7 +2,7 @@
 # Following Rust community standard style guide
 
 # Edition (must match Cargo.toml)
-edition = "2024"
+edition = "2021"
 
 # Maximum line width
 max_width = 100
@@ -11,28 +11,13 @@ max_width = 100
 hard_tabs = false
 tab_spaces = 4
 
-# Import organization
-imports_granularity = "Crate"
-group_imports = "StdExternalCrate"
+# Import organization (stable features only)
+reorder_imports = true
+reorder_modules = true
 
 # Formatting preferences
 newline_style = "Unix"
 use_small_heuristics = "Max"
-fn_single_line = false
-where_single_line = true
-
-# Comments and documentation
-wrap_comments = true
-normalize_comments = true
-normalize_doc_attributes = true
-
-# Code organization
-reorder_imports = true
-reorder_modules = true
-
-# Trailing commas
-trailing_comma = "Vertical"
-trailing_semicolon = true
 
 # Match formatting
 match_block_trailing_comma = true

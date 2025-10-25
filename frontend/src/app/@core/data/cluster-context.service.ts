@@ -1,43 +1,60 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { Cluster } from './cluster.service';
+import { BehaviorSubject, Observable, of } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
+import { Cluster, ClusterService } from './cluster.service';
 
 /**
  * Global cluster context service
  * Manages the currently active cluster across the application
+ * Gets active cluster from backend instead of localStorage
  */
 @Injectable({
   providedIn: 'root',
 })
 export class ClusterContextService {
-  private readonly STORAGE_KEY = 'active_cluster_id';
-  
   // Current active cluster
   private activeClusterSubject: BehaviorSubject<Cluster | null>;
   public activeCluster$: Observable<Cluster | null>;
   
-  constructor() {
-    // Try to restore active cluster from localStorage
-    const savedClusterId = this.getSavedClusterId();
-    console.log('[ClusterContext] Constructor - Saved clusterId:', savedClusterId);
+  constructor(private clusterService: ClusterService) {
     this.activeClusterSubject = new BehaviorSubject<Cluster | null>(null);
     this.activeCluster$ = this.activeClusterSubject.asObservable();
+    
+    // Try to load active cluster from backend on initialization
+    this.refreshActiveCluster();
   }
   
   /**
-   * Set the active cluster
+   * Set the active cluster by calling backend API
    */
-  setActiveCluster(cluster: Cluster | null): void {
-    console.log('[ClusterContext] Setting active cluster:', cluster);
-    this.activeClusterSubject.next(cluster);
+  setActiveCluster(cluster: Cluster): void {
+    // Call backend API to activate the cluster
+    this.clusterService.activateCluster(cluster.id).pipe(
+      tap((activatedCluster) => {
+        this.activeClusterSubject.next(activatedCluster);
+      }),
+      catchError((error) => {
+        // Still update local state for immediate feedback
+        this.activeClusterSubject.next(cluster);
+        return of(cluster);
+      })
+    ).subscribe();
+  }
+  
+  /**
+   * Refresh active cluster from backend
+   */
+  refreshActiveCluster(): void {
     
-    if (cluster) {
-      localStorage.setItem(this.STORAGE_KEY, cluster.id.toString());
-      console.log('[ClusterContext] Saved clusterId to localStorage:', cluster.id);
-    } else {
-      localStorage.removeItem(this.STORAGE_KEY);
-      console.log('[ClusterContext] Removed clusterId from localStorage');
-    }
+    this.clusterService.getActiveCluster().pipe(
+      tap((cluster) => {
+        this.activeClusterSubject.next(cluster);
+      }),
+      catchError((error) => {
+        this.activeClusterSubject.next(null);
+        return of(null);
+      })
+    ).subscribe();
   }
   
   /**
@@ -56,18 +73,10 @@ export class ClusterContextService {
   }
   
   /**
-   * Get saved cluster ID from localStorage
-   */
-  getSavedClusterId(): number | null {
-    const saved = localStorage.getItem(this.STORAGE_KEY);
-    return saved ? parseInt(saved, 10) : null;
-  }
-  
-  /**
    * Clear active cluster
    */
   clearActiveCluster(): void {
-    this.setActiveCluster(null);
+    this.activeClusterSubject.next(null);
   }
   
   /**

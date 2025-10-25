@@ -32,11 +32,11 @@ import { BackendsComponent } from './backends/backends.component';
 import { FrontendsComponent } from './frontends/frontends.component';
 import { MaterializedViewsComponent } from './materialized-views/materialized-views.component';
 import { QueriesComponent } from './queries/queries.component';
-import { MonitorComponent } from './monitor/monitor.component';
 import { SessionsComponent } from './sessions/sessions.component';
 import { VariablesComponent } from './variables/variables.component';
 import { SystemManagementComponent } from './system-management/system-management.component';
 import { ClusterOverviewComponent } from './cluster-overview/cluster-overview.component';
+import { MetricCardGroupComponent } from './cluster-overview/metric-card-group/metric-card-group.component';
 import { NestedLinkRenderComponent } from './system-management/nested-link-render.component';
 import { AddFunctionDialogComponent } from './system-management/add-function-dialog/add-function-dialog.component';
 import { EditFunctionDialogComponent } from './system-management/edit-function-dialog/edit-function-dialog.component';
@@ -54,11 +54,11 @@ import { ActiveToggleRenderComponent } from './materialized-views/active-toggle-
     MaterializedViewsComponent,
     ActiveToggleRenderComponent,
     QueriesComponent,
-    MonitorComponent,
     SessionsComponent,
     VariablesComponent,
     SystemManagementComponent,
     ClusterOverviewComponent,
+    MetricCardGroupComponent,
     NestedLinkRenderComponent,
     AddFunctionDialogComponent,
     EditFunctionDialogComponent,

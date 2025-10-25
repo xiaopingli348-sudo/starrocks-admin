@@ -153,78 +153,80 @@ export interface ProfileDetail {
 export class NodeService {
   constructor(private api: ApiService) {}
 
-  listBackends(clusterId: number): Observable<Backend[]> {
-    return this.api.get<Backend[]>(`/clusters/${clusterId}/backends`);
+  // All API methods now use backend routes without cluster ID
+  // The active cluster is determined by the backend
+  
+  listBackends(): Observable<Backend[]> {
+    return this.api.get<Backend[]>(`/clusters/backends`);
   }
 
-  deleteBackend(clusterId: number, host: string, port: string): Observable<any> {
-    return this.api.delete<any>(`/clusters/${clusterId}/backends/${host}/${port}`);
+  deleteBackend(host: string, port: string): Observable<any> {
+    return this.api.delete<any>(`/clusters/backends/${host}/${port}`);
   }
 
-  listFrontends(clusterId: number): Observable<Frontend[]> {
-    return this.api.get<Frontend[]>(`/clusters/${clusterId}/frontends`);
+  listFrontends(): Observable<Frontend[]> {
+    return this.api.get<Frontend[]>(`/clusters/frontends`);
   }
 
-  listQueries(clusterId: number): Observable<Query[]> {
-    return this.api.get<Query[]>(`/clusters/${clusterId}/queries`);
+  listQueries(): Observable<Query[]> {
+    return this.api.get<Query[]>(`/clusters/queries`);
   }
 
-  getSystemFunctions(clusterId: number): Observable<SystemFunction[]> {
-    return this.api.get<SystemFunction[]>(`/clusters/${clusterId}/system`);
+  getSystemFunctions(): Observable<SystemFunction[]> {
+    return this.api.get<SystemFunction[]>(`/clusters/system`);
   }
 
-  getSystemFunctionDetail(clusterId: number, functionName: string, nestedPath?: string): Observable<SystemFunctionDetail> {
+  getSystemFunctionDetail(functionName: string, nestedPath?: string): Observable<SystemFunctionDetail> {
     const url = nestedPath 
-      ? `/clusters/${clusterId}/system/${functionName}?path=${encodeURIComponent(nestedPath)}`
-      : `/clusters/${clusterId}/system/${functionName}`;
+      ? `/clusters/system/${functionName}?path=${encodeURIComponent(nestedPath)}`
+      : `/clusters/system/${functionName}`;
     return this.api.get<SystemFunctionDetail>(url);
   }
 
   // Sessions API
-  getSessions(clusterId: number): Observable<Session[]> {
-    return this.api.get<Session[]>(`/clusters/${clusterId}/sessions`);
+  getSessions(): Observable<Session[]> {
+    return this.api.get<Session[]>(`/clusters/sessions`);
   }
 
-  killSession(clusterId: number, sessionId: string): Observable<any> {
-    return this.api.delete(`/clusters/${clusterId}/sessions/${sessionId}`);
+  killSession(sessionId: string): Observable<any> {
+    return this.api.delete(`/clusters/sessions/${sessionId}`);
   }
 
   // Variables API
-  getVariables(clusterId: number, type: string = 'global', filter?: string): Observable<Variable[]> {
+  getVariables(type: string = 'global', filter?: string): Observable<Variable[]> {
     let params: any = { type };
     if (filter) {
       params.filter = filter;
     }
-    return this.api.get<Variable[]>(`/clusters/${clusterId}/variables`, params);
+    return this.api.get<Variable[]>(`/clusters/variables`, params);
   }
 
-  updateVariable(clusterId: number, variableName: string, request: VariableUpdateRequest): Observable<any> {
-    return this.api.put(`/clusters/${clusterId}/variables/${variableName}`, request);
+  updateVariable(variableName: string, request: VariableUpdateRequest): Observable<any> {
+    return this.api.put(`/clusters/variables/${variableName}`, request);
   }
 
   // Query History API with pagination
-  listQueryHistory(clusterId: number, limit: number = 10, offset: number = 0): Observable<QueryHistoryResponse> {
-    return this.api.get<QueryHistoryResponse>(`/clusters/${clusterId}/queries/history`, { limit, offset });
+  listQueryHistory(limit: number = 10, offset: number = 0): Observable<QueryHistoryResponse> {
+    return this.api.get<QueryHistoryResponse>(`/clusters/queries/history`, { limit, offset });
   }
 
   // Query Profile API
-  getQueryProfile(clusterId: number, queryId: string): Observable<QueryProfile> {
-    return this.api.get<QueryProfile>(`/clusters/${clusterId}/queries/${queryId}/profile`);
+  getQueryProfile(queryId: string): Observable<QueryProfile> {
+    return this.api.get<QueryProfile>(`/clusters/queries/${queryId}/profile`);
   }
 
   // Execute SQL API
-  executeSQL(clusterId: number, sql: string, limit?: number): Observable<QueryExecuteResult> {
+  executeSQL(sql: string, limit?: number): Observable<QueryExecuteResult> {
     const request: QueryExecuteRequest = { sql, limit };
-    return this.api.post<QueryExecuteResult>(`/clusters/${clusterId}/queries/execute`, request);
+    return this.api.post<QueryExecuteResult>(`/clusters/queries/execute`, request);
   }
 
   // Profile APIs
-  listProfiles(clusterId: number): Observable<ProfileListItem[]> {
-    return this.api.get<ProfileListItem[]>(`/clusters/${clusterId}/profiles`);
+  listProfiles(): Observable<ProfileListItem[]> {
+    return this.api.get<ProfileListItem[]>(`/clusters/profiles`);
   }
 
-  getProfile(clusterId: number, queryId: string): Observable<ProfileDetail> {
-    return this.api.get<ProfileDetail>(`/clusters/${clusterId}/profiles/${queryId}`);
+  getProfile(queryId: string): Observable<ProfileDetail> {
+    return this.api.get<ProfileDetail>(`/clusters/profiles/${queryId}`);
   }
 }
-
