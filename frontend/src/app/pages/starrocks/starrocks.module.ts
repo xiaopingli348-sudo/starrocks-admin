@@ -16,6 +16,7 @@ import {
   NbListModule,
   NbBadgeModule,
   NbProgressBarModule,
+  NbToggleModule,
 } from '@nebular/theme';
 import { Ng2SmartTableModule } from 'ng2-smart-table';
 import { NgxEchartsModule } from 'ngx-echarts';
@@ -35,6 +36,7 @@ import { MonitorComponent } from './monitor/monitor.component';
 import { SessionsComponent } from './sessions/sessions.component';
 import { VariablesComponent } from './variables/variables.component';
 import { SystemManagementComponent } from './system-management/system-management.component';
+import { ClusterOverviewComponent } from './cluster-overview/cluster-overview.component';
 import { NestedLinkRenderComponent } from './system-management/nested-link-render.component';
 import { AddFunctionDialogComponent } from './system-management/add-function-dialog/add-function-dialog.component';
 import { EditFunctionDialogComponent } from './system-management/edit-function-dialog/edit-function-dialog.component';
@@ -56,6 +58,7 @@ import { ActiveToggleRenderComponent } from './materialized-views/active-toggle-
     SessionsComponent,
     VariablesComponent,
     SystemManagementComponent,
+    ClusterOverviewComponent,
     NestedLinkRenderComponent,
     AddFunctionDialogComponent,
     EditFunctionDialogComponent,
@@ -81,6 +84,7 @@ import { ActiveToggleRenderComponent } from './materialized-views/active-toggle-
     NbListModule,
     NbBadgeModule,
     NbProgressBarModule,
+    NbToggleModule,
     Ng2SmartTableModule,
     NgxEchartsModule,
     DragDropModule,

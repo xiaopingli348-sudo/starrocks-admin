@@ -1,0 +1,401 @@
+<div class="cluster-overview">
+  <!-- Header Section -->
+  <div class="header-section">
+    <h3 class="page-title">Cluster Overview</h3>
+    
+    <div class="controls">
+      <!-- Time Range Selector -->
+      <nb-select [(selected)]="timeRange" (selectedChange)="onTimeRangeChange($event)" 
+                 placeholder="Time Range" size="small">
+        <nb-option *ngFor="let opt of timeRangeOptions" [value]="opt.value">
+          {{ opt.label }}
+        </nb-option>
+      </nb-select>
+
+      <!-- Refresh Interval Selector -->
+      <nb-select [(selected)]="refreshInterval" (selectedChange)="onRefreshIntervalChange($event)"
+                 placeholder="Refresh" size="small">
+        <nb-option *ngFor="let opt of refreshIntervalOptions" [value]="opt.value">
+          {{ opt.label }}
+        </nb-option>
+      </nb-select>
+
+      <!-- Manual Refresh Button -->
+      <button nbButton size="small" status="info" (click)="onManualRefresh()">
+        <nb-icon icon="refresh-outline"></nb-icon>
+        Refresh
+      </button>
+
+      <!-- Auto-refresh Toggle -->
+      <nb-toggle [(checked)]="autoRefresh" *ngIf="refreshInterval > 0">
+        Auto
+      </nb-toggle>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="loading-container">
+    <nb-spinner size="giant" status="primary"></nb-spinner>
+  </div>
+
+  <div *ngIf="!loading">
+    <!-- Health Cards Section -->
+    <div class="health-cards-section">
+      <h5 class="section-title">Cluster Health</h5>
+      <div class="health-cards-grid">
+        <nb-card *ngFor="let card of healthCards" 
+                 [status]="card.status" 
+                 class="health-card"
+                 [class.clickable]="card.navigateTo"
+                 (click)="navigateToCard(card)">
+          <nb-card-body>
+            <div class="card-icon">
+              <nb-icon [icon]="card.icon || getStatusIcon(card.status)" 
+                       [status]="card.status" 
+                       [options]="{ animation: { type: 'pulse' } }">
+              </nb-icon>
+            </div>
+            <div class="card-content">
+              <h6 class="card-title">{{ card.title }}</h6>
+              <h3 class="card-value">
+                {{ card.value }}
+                <span class="card-unit" *ngIf="card.unit">{{ card.unit }}</span>
+              </h3>
+              <div class="card-trend" *ngIf="card.trend !== undefined && card.trend !== 0">
+                <nb-icon [icon]="getTrendIcon(card.trend)" [status]="getTrendColor(card.trend)"></nb-icon>
+                <span [class]="'trend-' + getTrendColor(card.trend)">
+                  {{ card.trend > 0 ? '+' : '' }}{{ card.trend.toFixed(1) }}%
+                </span>
+              </div>
+            </div>
+          </nb-card-body>
+        </nb-card>
+      </div>
+    </div>
+
+    <div class="main-content-grid">
+      <!-- Left Column: Performance & Resources -->
+      <div class="left-column">
+        <!-- Performance Trends -->
+        <nb-card class="chart-card">
+          <nb-card-header>
+            <nb-icon icon="activity-outline" status="primary"></nb-icon>
+            Performance Trends
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="performanceTrends">
+              <!-- QPS Chart -->
+              <div class="chart-container">
+                <h6 class="chart-title">QPS (Queries Per Second)</h6>
+                <div echarts [options]="getQpsChartOptions()" class="echart"></div>
+              </div>
+
+              <!-- Latency Chart -->
+              <div class="chart-container">
+                <h6 class="chart-title">P99 Latency</h6>
+                <div echarts [options]="getLatencyChartOptions()" class="echart"></div>
+              </div>
+
+              <!-- Error Rate Chart -->
+              <div class="chart-container">
+                <h6 class="chart-title">Error Rate (%)</h6>
+                <div echarts [options]="getErrorRateChartOptions()" class="echart"></div>
+              </div>
+            </div>
+            <div *ngIf="!performanceTrends" class="no-data">
+              <p>No performance data available</p>
+            </div>
+          </nb-card-body>
+        </nb-card>
+
+        <!-- Resource Trends -->
+        <nb-card class="chart-card">
+          <nb-card-header>
+            <nb-icon icon="bar-chart-outline" status="warning"></nb-icon>
+            Resource Usage
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="resourceTrends">
+              <!-- CPU Chart -->
+              <div class="chart-container">
+                <h6 class="chart-title">CPU Usage (%)</h6>
+                <div echarts [options]="getCpuChartOptions()" class="echart"></div>
+              </div>
+
+              <!-- Memory Chart -->
+              <div class="chart-container">
+                <h6 class="chart-title">Memory Usage (%)</h6>
+                <div echarts [options]="getMemoryChartOptions()" class="echart"></div>
+              </div>
+
+              <!-- Disk Chart -->
+              <div class="chart-container">
+                <h6 class="chart-title">Disk Usage (%)</h6>
+                <div echarts [options]="getDiskChartOptions()" class="echart"></div>
+              </div>
+
+              <!-- Network Chart -->
+              <div class="chart-container">
+                <h6 class="chart-title">Network Traffic (MB/s)</h6>
+                <div echarts [options]="getNetworkChartOptions()" class="echart"></div>
+              </div>
+
+              <!-- I/O Chart -->
+              <div class="chart-container">
+                <h6 class="chart-title">Disk I/O (MB/s)</h6>
+                <div echarts [options]="getIoChartOptions()" class="echart"></div>
+              </div>
+            </div>
+            <div *ngIf="!resourceTrends" class="no-data">
+              <p>No resource data available</p>
+            </div>
+          </nb-card-body>
+        </nb-card>
+      </div>
+
+      <!-- Right Column: Data Statistics -->
+      <div class="right-column">
+        <!-- Data Statistics Summary -->
+        <nb-card class="stats-card">
+          <nb-card-header>
+            <nb-icon icon="pie-chart-outline" status="success"></nb-icon>
+            Data Statistics
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="dataStatistics">
+              <div class="stats-row">
+                <span class="stats-label">Databases:</span>
+                <span class="stats-value">{{ dataStatistics.databaseCount }}</span>
+              </div>
+              <div class="stats-row">
+                <span class="stats-label">Tables:</span>
+                <span class="stats-value">{{ dataStatistics.tableCount }}</span>
+              </div>
+              <div class="stats-row">
+                <span class="stats-label">Total Data:</span>
+                <span class="stats-value">{{ formatBytes(dataStatistics.totalDataSizeBytes) }}</span>
+              </div>
+              <div class="stats-row">
+                <span class="stats-label">Active Users (1h):</span>
+                <span class="stats-value">{{ dataStatistics.activeUsers1h }}</span>
+              </div>
+              <div class="stats-row">
+                <span class="stats-label">Active Users (24h):</span>
+                <span class="stats-value">{{ dataStatistics.activeUsers24h }}</span>
+              </div>
+            </div>
+            <div *ngIf="!dataStatistics" class="no-data">
+              <p>No data statistics available</p>
+            </div>
+          </nb-card-body>
+        </nb-card>
+
+        <!-- Materialized Views -->
+        <nb-card class="stats-card clickable" (click)="navigateToMaterializedViews()">
+          <nb-card-header>
+            <nb-icon icon="layers-outline" status="info"></nb-icon>
+            Materialized Views
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="dataStatistics">
+              <div class="stats-grid">
+                <div class="stats-item">
+                  <h4>{{ dataStatistics.mvTotal }}</h4>
+                  <p>Total</p>
+                </div>
+                <div class="stats-item">
+                  <h4 class="text-warning">{{ dataStatistics.mvRunning }}</h4>
+                  <p>Running</p>
+                </div>
+                <div class="stats-item">
+                  <h4 class="text-success">{{ dataStatistics.mvSuccess }}</h4>
+                  <p>Success</p>
+                </div>
+                <div class="stats-item">
+                  <h4 class="text-danger">{{ dataStatistics.mvFailed }}</h4>
+                  <p>Failed</p>
+                </div>
+              </div>
+            </div>
+          </nb-card-body>
+        </nb-card>
+
+        <!-- Schema Changes -->
+        <nb-card class="stats-card">
+          <nb-card-header>
+            <nb-icon icon="code-outline" status="primary"></nb-icon>
+            Schema Changes
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="dataStatistics">
+              <div class="stats-grid">
+                <div class="stats-item">
+                  <h4 class="text-warning">{{ dataStatistics.schemaChangeRunning }}</h4>
+                  <p>Running</p>
+                </div>
+                <div class="stats-item">
+                  <h4 class="text-info">{{ dataStatistics.schemaChangePending }}</h4>
+                  <p>Pending</p>
+                </div>
+                <div class="stats-item">
+                  <h4 class="text-success">{{ dataStatistics.schemaChangeFinished }}</h4>
+                  <p>Finished</p>
+                </div>
+                <div class="stats-item">
+                  <h4 class="text-danger">{{ dataStatistics.schemaChangeFailed }}</h4>
+                  <p>Failed</p>
+                </div>
+              </div>
+            </div>
+          </nb-card-body>
+        </nb-card>
+
+        <!-- Capacity Prediction -->
+        <nb-card class="capacity-card" [status]="capacityPrediction?.daysUntilFull && capacityPrediction.daysUntilFull < 30 ? 'warning' : 'basic'">
+          <nb-card-header>
+            <nb-icon icon="hard-drive-outline" status="warning"></nb-icon>
+            Capacity Prediction
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="capacityPrediction">
+              <div class="capacity-progress">
+                <nb-progress-bar [value]="capacityPrediction.diskUsagePct" 
+                                 [status]="capacityPrediction.diskUsagePct > 90 ? 'danger' : capacityPrediction.diskUsagePct > 70 ? 'warning' : 'success'">
+                </nb-progress-bar>
+                <span class="progress-label">{{ capacityPrediction.diskUsagePct.toFixed(1) }}% Used</span>
+              </div>
+              <div class="capacity-stats">
+                <div class="stats-row">
+                  <span class="stats-label">Used:</span>
+                  <span class="stats-value">{{ formatBytes(capacityPrediction.diskUsedBytes) }}</span>
+                </div>
+                <div class="stats-row">
+                  <span class="stats-label">Total:</span>
+                  <span class="stats-value">{{ formatBytes(capacityPrediction.diskTotalBytes) }}</span>
+                </div>
+                <div class="stats-row">
+                  <span class="stats-label">Daily Growth:</span>
+                  <span class="stats-value">{{ formatBytes(capacityPrediction.dailyGrowthBytes) }}/day</span>
+                </div>
+                <div class="stats-row" *ngIf="capacityPrediction.daysUntilFull">
+                  <span class="stats-label">Days Until Full:</span>
+                  <span class="stats-value" [class.text-danger]="capacityPrediction.daysUntilFull < 30">
+                    {{ capacityPrediction.daysUntilFull }} days
+                  </span>
+                </div>
+                <div class="stats-row" *ngIf="capacityPrediction.predictedFullDate">
+                  <span class="stats-label">Predicted Full Date:</span>
+                  <span class="stats-value">{{ capacityPrediction.predictedFullDate }}</span>
+                </div>
+                <div class="stats-row">
+                  <span class="stats-label">Growth Trend:</span>
+                  <nb-badge [status]="capacityPrediction.growthTrend === 'increasing' ? 'danger' : capacityPrediction.growthTrend === 'decreasing' ? 'success' : 'info'">
+                    {{ capacityPrediction.growthTrend }}
+                  </nb-badge>
+                </div>
+              </div>
+            </div>
+          </nb-card-body>
+        </nb-card>
+
+        <!-- Top Tables by Size -->
+        <nb-card class="table-card">
+          <nb-card-header>
+            <nb-icon icon="cube-outline" status="success"></nb-icon>
+            Top Tables by Size
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="dataStatistics && dataStatistics.topTablesBySize.length > 0">
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>Database.Table</th>
+                    <th>Size</th>
+                    <th>Rows</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let table of dataStatistics.topTablesBySize.slice(0, 10)">
+                    <td>{{ table.database }}.{{ table.table }}</td>
+                    <td>{{ formatBytes(table.sizeBytes) }}</td>
+                    <td>{{ table.rowCount ? formatNumber(table.rowCount) : 'N/A' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div *ngIf="!dataStatistics || dataStatistics.topTablesBySize.length === 0" class="no-data">
+              <p>No data available</p>
+            </div>
+          </nb-card-body>
+        </nb-card>
+
+        <!-- Top Tables by Access -->
+        <nb-card class="table-card clickable" (click)="navigateToQueries()">
+          <nb-card-header>
+            <nb-icon icon="trending-up-outline" status="primary"></nb-icon>
+            Top Tables by Access
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="dataStatistics && dataStatistics.topTablesByAccess.length > 0">
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>Database.Table</th>
+                    <th>Accesses</th>
+                    <th>Users</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let table of dataStatistics.topTablesByAccess.slice(0, 10)">
+                    <td>{{ table.database }}.{{ table.table }}</td>
+                    <td>{{ formatNumber(table.accessCount) }}</td>
+                    <td>{{ table.uniqueUsers }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div *ngIf="!dataStatistics || dataStatistics.topTablesByAccess.length === 0" class="no-data">
+              <p>No data available</p>
+            </div>
+          </nb-card-body>
+        </nb-card>
+
+        <!-- Slow Queries -->
+        <nb-card class="table-card clickable" (click)="navigateToQueries()">
+          <nb-card-header>
+            <nb-icon icon="flash-outline" status="danger"></nb-icon>
+            Slow Queries (24h)
+          </nb-card-header>
+          <nb-card-body>
+            <div *ngIf="dataStatistics && dataStatistics.slowQueries.length > 0">
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Database</th>
+                    <th>Duration</th>
+                    <th>Query</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let query of dataStatistics.slowQueries.slice(0, 10)">
+                    <td>{{ query.user }}</td>
+                    <td>{{ query.database }}</td>
+                    <td>{{ formatDuration(query.durationMs) }}</td>
+                    <td class="query-preview" [title]="query.queryPreview">
+                      {{ query.queryPreview }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div *ngIf="!dataStatistics || dataStatistics.slowQueries.length === 0" class="no-data">
+              <p>No slow queries found</p>
+            </div>
+          </nb-card-body>
+        </nb-card>
+      </div>
+    </div>
+  </div>
+</div>
+
