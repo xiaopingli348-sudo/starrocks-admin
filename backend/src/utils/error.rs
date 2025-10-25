@@ -6,6 +6,14 @@ use axum::{
 use serde::Serialize;
 use std::fmt;
 
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ApiError(code={}, message={})", self.code, self.message)
+    }
+}
+
+impl std::error::Error for ApiError {}
+
 #[derive(Debug, Serialize)]
 pub struct ApiError {
     pub code: i32,
@@ -141,6 +149,12 @@ impl From<sqlx::Error> for ApiError {
 impl From<anyhow::Error> for ApiError {
     fn from(err: anyhow::Error) -> Self {
         ApiError::internal_error(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for ApiError {
+    fn from(err: serde_json::Error) -> Self {
+        ApiError::internal_error(format!("JSON serialization error: {}", err))
     }
 }
 

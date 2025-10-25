@@ -1,6 +1,6 @@
 use crate::models::{
     Backend, Cluster, Database, Frontend, MaterializedView, Query, RuntimeInfo,
-    SchemaChange, Table, TableInfo,
+    SchemaChange, Table,
 };
 use crate::utils::{ApiError, ApiResult};
 use reqwest::Client;

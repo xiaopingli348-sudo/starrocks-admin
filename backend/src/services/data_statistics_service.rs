@@ -3,15 +3,16 @@
 // Design Ref: CLUSTER_OVERVIEW_PLAN.md
 
 use crate::models::Cluster;
-use crate::services::{ClusterService, MaterializedViewService, MySQLClient, MySQLPoolManager, StarRocksClient};
+use crate::services::{AuditLogService, ClusterService, MaterializedViewService, MySQLClient, MySQLPoolManager, StarRocksClient};
 use crate::utils::ApiResult;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 /// Top table by size
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct TopTableBySize {
     pub database: String,
     pub table: String,
@@ -20,7 +21,7 @@ pub struct TopTableBySize {
 }
 
 /// Top table by access count
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct TopTableByAccess {
     pub database: String,
     pub table: String,
@@ -29,7 +30,7 @@ pub struct TopTableByAccess {
 }
 
 /// Data statistics cache
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct DataStatistics {
     pub cluster_id: i64,
     pub updated_at: chrono::DateTime<Utc>,
@@ -183,22 +184,22 @@ impl DataStatisticsService {
             Ok(Some(DataStatistics {
                 cluster_id: r.cluster_id,
                 updated_at: r.updated_at.and_utc(),
-                database_count: r.database_count,
-                table_count: r.table_count,
+                database_count: r.database_count as i32,
+                table_count: r.table_count as i32,
                 total_data_size: r.total_data_size,
                 total_index_size: r.total_index_size,
                 top_tables_by_size,
                 top_tables_by_access,
-                mv_total: r.mv_total,
-                mv_running: r.mv_running,
-                mv_failed: r.mv_failed,
-                mv_success: r.mv_success,
-                schema_change_running: r.schema_change_running,
-                schema_change_pending: r.schema_change_pending,
-                schema_change_finished: r.schema_change_finished,
-                schema_change_failed: r.schema_change_failed,
-                active_users_1h: r.active_users_1h,
-                active_users_24h: r.active_users_24h,
+                mv_total: r.mv_total as i32,
+                mv_running: r.mv_running as i32,
+                mv_failed: r.mv_failed as i32,
+                mv_success: r.mv_success as i32,
+                schema_change_running: r.schema_change_running as i32,
+                schema_change_pending: r.schema_change_pending as i32,
+                schema_change_finished: r.schema_change_finished as i32,
+                schema_change_failed: r.schema_change_failed as i32,
+                active_users_1h: r.active_users_1h as i32,
+                active_users_24h: r.active_users_24h as i32,
                 unique_users,
             }))
         } else {
@@ -266,20 +267,26 @@ impl DataStatisticsService {
         cluster: &Cluster,
         limit: usize,
     ) -> ApiResult<Vec<TopTableByAccess>> {
-        // TODO: Implement when audit logs are available
-        // For now, return empty list
+        // Use AuditLogService to query audit logs
+        let audit_service = AuditLogService::new(self.mysql_pool_manager.clone());
         
-        // Placeholder implementation:
-        // If audit logs are available, query like:
-        // SELECT table_name, COUNT(*) as access_count, MAX(query_time) as last_access
-        // FROM audit_log
-        // WHERE query_time > NOW() - INTERVAL 24 HOUR
-        // GROUP BY table_name
-        // ORDER BY access_count DESC
-        // LIMIT limit
+        // Query last 24 hours
+        let audit_tables = audit_service
+            .get_top_tables_by_access(cluster, 24, limit)
+            .await?;
         
-        tracing::debug!("Top tables by access requires audit logs (not yet implemented)");
-        Ok(Vec::new())
+        // Convert AuditTopTableByAccess to TopTableByAccess
+        let tables = audit_tables
+            .into_iter()
+            .map(|t| TopTableByAccess {
+                database: t.database,
+                table: t.table,
+                access_count: t.access_count,
+                last_access: t.last_access,
+            })
+            .collect();
+        
+        Ok(tables)
     }
 
     /// Get materialized view statistics

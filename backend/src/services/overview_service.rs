@@ -2,13 +2,13 @@
 // Purpose: Provide aggregated cluster overview data (real-time + historical)
 // Design Ref: ARCHITECTURE_ANALYSIS_AND_INTEGRATION.md
 
-use crate::models::Cluster;
 use crate::services::{ClusterService, DataStatistics, DataStatisticsService, MetricsSnapshot};
 use crate::utils::{ApiError, ApiResult, ErrorCode};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 /// Time range for querying historical data
 #[derive(Debug, Clone, Deserialize)]
@@ -44,7 +44,7 @@ impl TimeRange {
 }
 
 /// Cluster overview data
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ClusterOverview {
     pub cluster_id: i64,
     pub cluster_name: String,
@@ -62,7 +62,7 @@ pub struct ClusterOverview {
 }
 
 /// Performance trends over time
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PerformanceTrends {
     pub qps: Vec<TimeSeriesPoint>,
     pub latency_p99: Vec<TimeSeriesPoint>,
@@ -70,7 +70,7 @@ pub struct PerformanceTrends {
 }
 
 /// Resource trends over time
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ResourceTrends {
     pub cpu_usage: Vec<TimeSeriesPoint>,
     pub memory_usage: Vec<TimeSeriesPoint>,
@@ -78,14 +78,26 @@ pub struct ResourceTrends {
 }
 
 /// Time series data point
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, ToSchema)]
 pub struct TimeSeriesPoint {
     pub timestamp: DateTime<Utc>,
     pub value: f64,
 }
 
+/// Capacity prediction result
+#[derive(Debug, Serialize, Clone, ToSchema)]
+pub struct CapacityPrediction {
+    pub disk_total_bytes: i64,
+    pub disk_used_bytes: i64,
+    pub disk_usage_pct: f64,
+    pub daily_growth_bytes: i64,
+    pub days_until_full: Option<i32>,
+    pub predicted_full_date: Option<String>,
+    pub growth_trend: String, // "increasing", "stable", "decreasing"
+}
+
 /// Aggregated statistics
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AggregatedStatistics {
     pub avg_qps: f64,
     pub max_qps: f64,
@@ -96,7 +108,7 @@ pub struct AggregatedStatistics {
 }
 
 /// Health status card
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct HealthCard {
     pub title: String,
     pub value: String,
@@ -105,7 +117,7 @@ pub struct HealthCard {
 }
 
 /// Health status enum
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum HealthStatus {
     Healthy,
@@ -301,6 +313,101 @@ impl OverviewService {
         }
     }
 
+    /// Predict disk capacity
+    /// 
+    /// Uses linear regression on historical disk usage data to predict when disk will be full
+    pub async fn predict_capacity(&self, cluster_id: i64) -> ApiResult<CapacityPrediction> {
+        // Get last 7 days of disk usage data
+        let cutoff = Utc::now() - chrono::Duration::days(7);
+        
+        let snapshots = sqlx::query!(
+            r#"
+            SELECT 
+                disk_total_bytes,
+                disk_used_bytes,
+                disk_usage_pct,
+                collected_at
+            FROM metrics_snapshots
+            WHERE cluster_id = ? AND collected_at >= ?
+            ORDER BY collected_at ASC
+            "#,
+            cluster_id,
+            cutoff
+        )
+        .fetch_all(&self.db)
+        .await?;
+        
+        if snapshots.is_empty() {
+            return Err(ApiError::new(
+                ErrorCode::InternalError,
+                "No historical data available for capacity prediction"
+            ));
+        }
+        
+        // Get latest values
+        let latest = snapshots.last().unwrap();
+        let disk_total_bytes = latest.disk_total_bytes;
+        let disk_used_bytes = latest.disk_used_bytes;
+        let disk_usage_pct = latest.disk_usage_pct;
+        
+        // Perform linear regression on disk_used_bytes over time
+        // y = disk_used_bytes, x = days since first snapshot
+        let first_time = snapshots.first().unwrap().collected_at.and_utc().timestamp();
+        
+        let mut sum_x = 0.0;
+        let mut sum_y = 0.0;
+        let mut sum_xy = 0.0;
+        let mut sum_x2 = 0.0;
+        let n = snapshots.len() as f64;
+        
+        for snapshot in &snapshots {
+            let x = (snapshot.collected_at.and_utc().timestamp() - first_time) as f64 / 86400.0; // days
+            let y = snapshot.disk_used_bytes as f64;
+            
+            sum_x += x;
+            sum_y += y;
+            sum_xy += x * y;
+            sum_x2 += x * x;
+        }
+        
+        // Calculate slope (daily growth rate in bytes)
+        let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x);
+        let daily_growth_bytes = slope as i64;
+        
+        // Determine growth trend
+        let growth_trend = if daily_growth_bytes > 1_000_000_000 {
+            // > 1GB/day
+            "increasing"
+        } else if daily_growth_bytes > 0 {
+            "stable"
+        } else {
+            "decreasing"
+        };
+        
+        // Calculate days until full (if disk is growing)
+        let (days_until_full, predicted_full_date) = if daily_growth_bytes > 0 {
+            let remaining_bytes = disk_total_bytes - disk_used_bytes;
+            let days = (remaining_bytes as f64 / daily_growth_bytes as f64).ceil() as i32;
+            
+            let full_date = Utc::now() + chrono::Duration::days(days as i64);
+            let full_date_str = full_date.format("%Y-%m-%d").to_string();
+            
+            (Some(days), Some(full_date_str))
+        } else {
+            (None, None)
+        };
+        
+        Ok(CapacityPrediction {
+            disk_total_bytes,
+            disk_used_bytes,
+            disk_usage_pct,
+            daily_growth_bytes,
+            days_until_full,
+            predicted_full_date,
+            growth_trend: growth_trend.to_string(),
+        })
+    }
+
     // ========================================
     // Internal helper methods
     // ========================================
@@ -332,10 +439,10 @@ impl OverviewService {
                 query_success: r.query_success,
                 query_error: r.query_error,
                 query_timeout: r.query_timeout,
-                backend_total: r.backend_total,
-                backend_alive: r.backend_alive,
-                frontend_total: r.frontend_total,
-                frontend_alive: r.frontend_alive,
+                backend_total: r.backend_total as i32,
+                backend_alive: r.backend_alive as i32,
+                frontend_total: r.frontend_total as i32,
+                frontend_alive: r.frontend_alive as i32,
                 total_cpu_usage: r.total_cpu_usage,
                 avg_cpu_usage: r.avg_cpu_usage,
                 total_memory_usage: r.total_memory_usage,
@@ -345,15 +452,23 @@ impl OverviewService {
                 disk_usage_pct: r.disk_usage_pct,
                 tablet_count: r.tablet_count,
                 max_compaction_score: r.max_compaction_score,
-                txn_running: r.txn_running,
+                txn_running: r.txn_running as i32,
                 txn_success_total: r.txn_success_total,
                 txn_failed_total: r.txn_failed_total,
-                load_running: r.load_running,
+                load_running: r.load_running as i32,
                 load_finished_total: r.load_finished_total,
                 jvm_heap_total: r.jvm_heap_total,
                 jvm_heap_used: r.jvm_heap_used,
                 jvm_heap_usage_pct: r.jvm_heap_usage_pct,
-                jvm_thread_count: r.jvm_thread_count,
+                jvm_thread_count: r.jvm_thread_count as i32,
+                network_bytes_sent_total: r.network_bytes_sent_total,
+                network_bytes_received_total: r.network_bytes_received_total,
+                network_send_rate: r.network_send_rate,
+                network_receive_rate: r.network_receive_rate,
+                io_read_bytes_total: r.io_read_bytes_total,
+                io_write_bytes_total: r.io_write_bytes_total,
+                io_read_rate: r.io_read_rate,
+                io_write_rate: r.io_write_rate,
             }))
         } else {
             Ok(None)
@@ -397,10 +512,10 @@ impl OverviewService {
                 query_success: r.query_success,
                 query_error: r.query_error,
                 query_timeout: r.query_timeout,
-                backend_total: r.backend_total,
-                backend_alive: r.backend_alive,
-                frontend_total: r.frontend_total,
-                frontend_alive: r.frontend_alive,
+                backend_total: r.backend_total as i32,
+                backend_alive: r.backend_alive as i32,
+                frontend_total: r.frontend_total as i32,
+                frontend_alive: r.frontend_alive as i32,
                 total_cpu_usage: r.total_cpu_usage,
                 avg_cpu_usage: r.avg_cpu_usage,
                 total_memory_usage: r.total_memory_usage,
@@ -410,15 +525,23 @@ impl OverviewService {
                 disk_usage_pct: r.disk_usage_pct,
                 tablet_count: r.tablet_count,
                 max_compaction_score: r.max_compaction_score,
-                txn_running: r.txn_running,
+                txn_running: r.txn_running as i32,
                 txn_success_total: r.txn_success_total,
                 txn_failed_total: r.txn_failed_total,
-                load_running: r.load_running,
+                load_running: r.load_running as i32,
                 load_finished_total: r.load_finished_total,
                 jvm_heap_total: r.jvm_heap_total,
                 jvm_heap_used: r.jvm_heap_used,
                 jvm_heap_usage_pct: r.jvm_heap_usage_pct,
-                jvm_thread_count: r.jvm_thread_count,
+                jvm_thread_count: r.jvm_thread_count as i32,
+                network_bytes_sent_total: r.network_bytes_sent_total,
+                network_bytes_received_total: r.network_bytes_received_total,
+                network_send_rate: r.network_send_rate,
+                network_receive_rate: r.network_receive_rate,
+                io_read_bytes_total: r.io_read_bytes_total,
+                io_write_bytes_total: r.io_write_bytes_total,
+                io_read_rate: r.io_read_rate,
+                io_write_rate: r.io_write_rate,
             })
             .collect();
         

@@ -2,7 +2,7 @@
 // Purpose: Periodically collect metrics from StarRocks clusters and store them in SQLite
 // Design Ref: ARCHITECTURE_ANALYSIS_AND_INTEGRATION.md
 
-use crate::models::{Cluster, MetricsSummary};
+use crate::models::Cluster;
 use crate::services::{ClusterService, StarRocksClient};
 use crate::utils::{ApiResult, ScheduledTask};
 use chrono::Utc;
@@ -11,9 +11,10 @@ use sqlx::SqlitePool;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 /// Metrics snapshot stored in database
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct MetricsSnapshot {
     pub cluster_id: i64,
     pub collected_at: chrono::DateTime<Utc>,
@@ -450,10 +451,10 @@ impl MetricsCollectorService {
                 query_success: r.query_success,
                 query_error: r.query_error,
                 query_timeout: r.query_timeout,
-                backend_total: r.backend_total,
-                backend_alive: r.backend_alive,
-                frontend_total: r.frontend_total,
-                frontend_alive: r.frontend_alive,
+                backend_total: r.backend_total as i32,
+                backend_alive: r.backend_alive as i32,
+                frontend_total: r.frontend_total as i32,
+                frontend_alive: r.frontend_alive as i32,
                 total_cpu_usage: r.total_cpu_usage,
                 avg_cpu_usage: r.avg_cpu_usage,
                 total_memory_usage: r.total_memory_usage,
@@ -463,15 +464,15 @@ impl MetricsCollectorService {
                 disk_usage_pct: r.disk_usage_pct,
                 tablet_count: r.tablet_count,
                 max_compaction_score: r.max_compaction_score,
-                txn_running: r.txn_running,
+                txn_running: r.txn_running as i32,
                 txn_success_total: r.txn_success_total,
                 txn_failed_total: r.txn_failed_total,
-                load_running: r.load_running,
+                load_running: r.load_running as i32,
                 load_finished_total: r.load_finished_total,
                 jvm_heap_total: r.jvm_heap_total,
                 jvm_heap_used: r.jvm_heap_used,
                 jvm_heap_usage_pct: r.jvm_heap_usage_pct,
-                jvm_thread_count: r.jvm_thread_count,
+                jvm_thread_count: r.jvm_thread_count as i32,
                 network_bytes_sent_total: r.network_bytes_sent_total,
                 network_bytes_received_total: r.network_bytes_received_total,
                 network_send_rate: r.network_send_rate,
@@ -563,8 +564,8 @@ impl MetricsCollectorService {
                 MAX(avg_cpu_usage) as max_cpu_usage,
                 AVG(avg_memory_usage) as avg_memory_usage,
                 MAX(avg_memory_usage) as max_memory_usage,
-                AVG(disk_usage_pct) as avg_disk_usage,
-                MAX(disk_usage_pct) as max_disk_usage,
+                AVG(disk_usage_pct) as avg_disk_usage_pct,
+                MAX(disk_usage_pct) as max_disk_usage_pct,
                 AVG(disk_used_bytes) as avg_disk_used_bytes,
                 MAX(disk_used_bytes) as max_disk_used_bytes
             FROM metrics_snapshots
@@ -588,6 +589,21 @@ impl MetricsCollectorService {
             0.0
         };
         
+        // Prepare values (to avoid temporary value lifetime issues)
+        let avg_qps = snapshots.avg_qps.unwrap_or(0.0);
+        let max_qps = snapshots.max_qps.unwrap_or(0.0);
+        let min_qps = snapshots.min_qps.unwrap_or(0.0);
+        let avg_latency_p99 = snapshots.avg_latency_p99.unwrap_or(0.0);
+        let max_latency_p99 = snapshots.max_latency_p99.unwrap_or(0.0);
+        let avg_cpu_usage = snapshots.avg_cpu_usage.unwrap_or(0.0);
+        let max_cpu_usage = snapshots.max_cpu_usage.unwrap_or(0.0);
+        let avg_memory_usage = snapshots.avg_memory_usage.unwrap_or(0.0);
+        let max_memory_usage = snapshots.max_memory_usage.unwrap_or(0.0);
+        let avg_disk_usage_pct = snapshots.avg_disk_usage_pct.unwrap_or(0.0);
+        let max_disk_usage_pct = snapshots.max_disk_usage_pct.unwrap_or(0.0);
+        let data_size_end = snapshots.avg_disk_used_bytes.unwrap_or(0) as i64;
+        let data_growth_bytes = 0i64; // Would need previous day's value
+        
         // Insert or update daily snapshot
         sqlx::query!(
             r#"
@@ -598,8 +614,8 @@ impl MetricsCollectorService {
                 total_queries, total_errors, error_rate,
                 avg_cpu_usage, max_cpu_usage,
                 avg_memory_usage, max_memory_usage,
-                avg_disk_usage, max_disk_usage,
-                total_data_bytes, daily_data_growth_bytes
+                avg_disk_usage_pct, max_disk_usage_pct,
+                data_size_end, data_growth_bytes
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(cluster_id, snapshot_date) DO UPDATE SET
                 avg_qps = excluded.avg_qps,
@@ -614,29 +630,29 @@ impl MetricsCollectorService {
                 max_cpu_usage = excluded.max_cpu_usage,
                 avg_memory_usage = excluded.avg_memory_usage,
                 max_memory_usage = excluded.max_memory_usage,
-                avg_disk_usage = excluded.avg_disk_usage,
-                max_disk_usage = excluded.max_disk_usage,
-                total_data_bytes = excluded.total_data_bytes,
-                daily_data_growth_bytes = excluded.daily_data_growth_bytes
+                avg_disk_usage_pct = excluded.avg_disk_usage_pct,
+                max_disk_usage_pct = excluded.max_disk_usage_pct,
+                data_size_end = excluded.data_size_end,
+                data_growth_bytes = excluded.data_growth_bytes
             "#,
             cluster_id,
             yesterday,
-            snapshots.avg_qps.unwrap_or(0.0),
-            snapshots.max_qps.unwrap_or(0.0),
-            snapshots.min_qps.unwrap_or(0.0),
-            snapshots.avg_latency_p99.unwrap_or(0.0),
-            snapshots.max_latency_p99.unwrap_or(0.0),
+            avg_qps,
+            max_qps,
+            min_qps,
+            avg_latency_p99,
+            max_latency_p99,
             total_queries,
             total_errors,
             error_rate,
-            snapshots.avg_cpu_usage.unwrap_or(0.0),
-            snapshots.max_cpu_usage.unwrap_or(0.0),
-            snapshots.avg_memory_usage.unwrap_or(0.0),
-            snapshots.max_memory_usage.unwrap_or(0.0),
-            snapshots.avg_disk_usage.unwrap_or(0.0),
-            snapshots.max_disk_usage.unwrap_or(0.0),
-            snapshots.avg_disk_used_bytes.unwrap_or(0) as i64,
-            0 as i64 // daily_data_growth_bytes (would need previous day's value)
+            avg_cpu_usage,
+            max_cpu_usage,
+            avg_memory_usage,
+            max_memory_usage,
+            avg_disk_usage_pct,
+            max_disk_usage_pct,
+            data_size_end,
+            data_growth_bytes
         )
         .execute(&self.db)
         .await?;
