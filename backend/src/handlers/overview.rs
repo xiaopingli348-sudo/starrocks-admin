@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::services::{
-    ClusterOverview, DataStatistics, HealthCard, OverviewService, PerformanceTrends, ResourceTrends, TimeRange,
+    AuditLogService, CapacityPrediction, ClusterOverview, DataStatistics, HealthCard, OverviewService, PerformanceTrends, ResourceTrends, SlowQuery, TimeRange,
 };
 use crate::utils::ApiResult;
 
@@ -230,5 +230,86 @@ pub async fn get_data_statistics(
     let stats = overview_service.get_data_statistics(cluster_id).await?;
 
     Ok(Json(stats))
+}
+
+/// Get slow queries
+/// 
+/// Returns slow-running queries from audit logs
+#[utoipa::path(
+    get,
+    path = "/api/clusters/{id}/overview/slow-queries",
+    params(
+        ("id" = i64, Path, description = "Cluster ID"),
+        ("hours" = Option<i32>, Query, description = "Time window in hours (default: 24)"),
+        ("min_duration" = Option<i64>, Query, description = "Minimum duration in ms (default: 1000)"),
+        ("limit" = Option<usize>, Query, description = "Maximum results (default: 20)")
+    ),
+    responses(
+        (status = 200, description = "Slow queries list", body = Vec<SlowQuery>),
+        (status = 404, description = "Cluster not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Cluster Overview"
+)]
+pub async fn get_slow_queries(
+    State(state): State<Arc<crate::AppState>>,
+    Path(cluster_id): Path<i64>,
+    Query(params): Query<SlowQueryParams>,
+) -> ApiResult<Json<Vec<SlowQuery>>> {
+    tracing::debug!("GET /api/clusters/{}/overview/slow-queries", cluster_id);
+
+    let cluster = state.cluster_service.get_cluster(cluster_id).await?;
+    
+    let audit_service = AuditLogService::new(state.mysql_pool_manager.clone());
+    let slow_queries = audit_service
+        .get_slow_queries(
+            &cluster,
+            params.hours.unwrap_or(24),
+            params.min_duration.unwrap_or(1000),
+            params.limit.unwrap_or(20),
+        )
+        .await?;
+
+    Ok(Json(slow_queries))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SlowQueryParams {
+    pub hours: Option<i32>,
+    pub min_duration: Option<i64>,
+    pub limit: Option<usize>,
+}
+
+/// Get capacity prediction
+/// 
+/// Returns disk capacity prediction based on historical growth trend
+#[utoipa::path(
+    get,
+    path = "/api/clusters/{id}/overview/capacity-prediction",
+    params(
+        ("id" = i64, Path, description = "Cluster ID")
+    ),
+    responses(
+        (status = 200, description = "Capacity prediction", body = CapacityPrediction),
+        (status = 404, description = "Cluster not found or no historical data"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Cluster Overview"
+)]
+pub async fn get_capacity_prediction(
+    State(overview_service): State<OverviewServiceState>,
+    Path(cluster_id): Path<i64>,
+) -> ApiResult<Json<CapacityPrediction>> {
+    tracing::debug!("GET /api/clusters/{}/overview/capacity-prediction", cluster_id);
+
+    let prediction = overview_service.predict_capacity(cluster_id).await?;
+
+    Ok(Json(prediction))
 }
 

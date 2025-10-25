@@ -82,6 +82,8 @@ pub struct AppState {
         handlers::overview::get_performance_trends,
         handlers::overview::get_resource_trends,
         handlers::overview::get_data_statistics,
+        handlers::overview::get_slow_queries,
+        handlers::overview::get_capacity_prediction,
     ),
     components(
         schemas(
@@ -126,6 +128,8 @@ pub struct AppState {
             services::DataStatistics,
             services::TopTableBySize,
             services::TopTableByAccess,
+            services::CapacityPrediction,
+            services::SlowQuery,
         )
     ),
     tags(
@@ -273,10 +277,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/clusters/:id/overview/performance", get(handlers::overview::get_performance_trends))
         .route("/api/clusters/:id/overview/resources", get(handlers::overview::get_resource_trends))
         .route("/api/clusters/:id/overview/data-stats", get(handlers::overview::get_data_statistics))
+        .route("/api/clusters/:id/overview/capacity-prediction", get(handlers::overview::get_capacity_prediction))
         .with_state(overview_service.clone());
-
+    
     // Routes using AppState  
     let app_state_arc = Arc::new(app_state.clone());
+    
+    // Routes using AppState (for audit log queries)
+    let overview_audit_routes = Router::new()
+        .route("/api/clusters/:id/overview/slow-queries", get(handlers::overview::get_slow_queries))
+        .with_state(app_state_arc.clone());
     let app_routes = Router::new()
         .route("/api/clusters/:id/health", get(handlers::cluster::get_cluster_health).post(handlers::cluster::get_cluster_health))
         .route("/api/clusters/:id/materialized_views", get(handlers::materialized_view::list_materialized_views).post(handlers::materialized_view::create_materialized_view))
@@ -314,6 +324,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(auth_routes)
         .merge(cluster_routes)
         .merge(overview_routes)
+        .merge(overview_audit_routes)
         .merge(app_routes)
         .layer(axum_middleware::from_fn_with_state(
             auth_state,
