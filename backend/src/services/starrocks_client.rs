@@ -313,6 +313,7 @@ impl StarRocksClient {
 
     // Get materialized views list (both async and sync/ROLLUP)
     // If database is None, fetches MVs from all databases in the catalog
+    #[allow(dead_code)]
     pub async fn get_materialized_views(
         &self,
         database: Option<&str>,
@@ -350,6 +351,7 @@ impl StarRocksClient {
     }
     
     // Get all databases in the catalog
+    #[allow(dead_code)]
     async fn get_all_databases(&self) -> ApiResult<Vec<String>> {
         let sql = "SHOW DATABASES";
         tracing::debug!("Fetching all databases with SQL: {}", sql);
@@ -392,14 +394,13 @@ impl StarRocksClient {
         
         if let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
             for row in rows {
-                if let Some(row_array) = row.as_array() {
-                    if let Some(db_name) = row_array.first().and_then(|v| v.as_str()) {
+                if let Some(row_array) = row.as_array()
+                    && let Some(db_name) = row_array.first().and_then(|v| v.as_str()) {
                         // Skip system databases
                         if db_name != "information_schema" && db_name != "_statistics_" {
                             databases.push(db_name.to_string());
                         }
                     }
-                }
             }
         }
         
@@ -408,6 +409,7 @@ impl StarRocksClient {
     }
 
     // Get async materialized views only
+    #[allow(dead_code)]
     async fn get_async_materialized_views(
         &self,
         database: Option<&str>,
@@ -466,6 +468,7 @@ impl StarRocksClient {
     }
 
     // Get sync materialized views (ROLLUP) from SHOW ALTER MATERIALIZED VIEW
+    #[allow(dead_code)]
     async fn get_sync_materialized_views(
         &self,
         database: Option<&str>,
@@ -498,7 +501,7 @@ impl StarRocksClient {
             .await
             .map_err(|e| {
                 tracing::warn!("Failed to fetch sync materialized views: {}", e);
-                return ApiError::cluster_connection_failed(format!("Request failed: {}", e));
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
             })?;
 
         if !response.status().is_success() {
@@ -508,7 +511,7 @@ impl StarRocksClient {
 
         let data: Value = response.json().await.map_err(|e| {
             tracing::warn!("Failed to parse sync materialized views response: {}", e);
-            return ApiError::internal_error(format!("Failed to parse response: {}", e));
+            ApiError::internal_error(format!("Failed to parse response: {}", e))
         })?;
 
         // Parse SHOW ALTER MATERIALIZED VIEW result
@@ -518,6 +521,7 @@ impl StarRocksClient {
     }
 
     // Get single materialized view details
+    #[allow(dead_code)]
     pub async fn get_materialized_view(&self, mv_name: &str) -> ApiResult<MaterializedView> {
         let sql = format!("SHOW MATERIALIZED VIEWS WHERE NAME = '{}'", mv_name);
         tracing::debug!("Fetching materialized view details with SQL: {}", sql);
@@ -562,6 +566,7 @@ impl StarRocksClient {
     }
 
     // Get materialized view DDL
+    #[allow(dead_code)]
     pub async fn get_materialized_view_ddl(&self, mv_name: &str) -> ApiResult<String> {
         let sql = format!("SHOW CREATE MATERIALIZED VIEW `{}`", mv_name);
         tracing::debug!("Fetching materialized view DDL with SQL: {}", sql);
@@ -601,22 +606,19 @@ impl StarRocksClient {
 
         // Extract DDL from result
         // SHOW CREATE MATERIALIZED VIEW returns: [[mv_name, create_statement]]
-        if let Some(rows) = data["data"].as_array() {
-            if let Some(row) = rows.first() {
-                if let Some(row_array) = row.as_array() {
-                    if let Some(ddl) = row_array.get(1) {
-                        if let Some(ddl_str) = ddl.as_str() {
+        if let Some(rows) = data["data"].as_array()
+            && let Some(row) = rows.first()
+                && let Some(row_array) = row.as_array()
+                    && let Some(ddl) = row_array.get(1)
+                        && let Some(ddl_str) = ddl.as_str() {
                             return Ok(ddl_str.to_string());
                         }
-                    }
-                }
-            }
-        }
 
         Err(ApiError::internal_error("Failed to extract DDL from response"))
     }
 
     // Parse materialized view result format
+    #[allow(dead_code)]
     fn parse_mv_result(data: &Value) -> ApiResult<Vec<MaterializedView>> {
         // Check if data has "data" field (new format) or use root (old format)
         let result_data = data.get("data").unwrap_or(data);
@@ -627,8 +629,8 @@ impl StarRocksClient {
         }
 
         // Try PROC result format: {"columnNames": [...], "rows": [[...]]}
-        if let Some(column_names) = result_data.get("columnNames").and_then(|v| v.as_array()) {
-            if let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
+        if let Some(column_names) = result_data.get("columnNames").and_then(|v| v.as_array())
+            && let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
                 let mut results = Vec::new();
 
                 for row in rows {
@@ -639,11 +641,10 @@ impl StarRocksClient {
                     // Create a JSON object from column names and row values
                     let mut obj = serde_json::Map::new();
                     for (i, col_name) in column_names.iter().enumerate() {
-                        if let Some(col_name_str) = col_name.as_str() {
-                            if let Some(value) = row_array.get(i) {
+                        if let Some(col_name_str) = col_name.as_str()
+                            && let Some(value) = row_array.get(i) {
                                 obj.insert(col_name_str.to_string(), value.clone());
                             }
-                        }
                     }
 
                     let mv: MaterializedView = serde_json::from_value(Value::Object(obj))
@@ -654,19 +655,19 @@ impl StarRocksClient {
 
                 return Ok(results);
             }
-        }
 
         Err(ApiError::internal_error("Unsupported materialized view result format"))
     }
 
     // Parse SHOW ALTER MATERIALIZED VIEW result to MaterializedView format
     // Returns FINISHED sync MVs only
+    #[allow(dead_code)]
     fn parse_sync_mv_result(data: &Value, database: Option<&str>) -> ApiResult<Vec<MaterializedView>> {
         let result_data = data.get("data").unwrap_or(data);
         
         // Try PROC result format: {"columnNames": [...], "rows": [[...]]}
-        if let Some(column_names) = result_data.get("columnNames").and_then(|v| v.as_array()) {
-            if let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
+        if let Some(column_names) = result_data.get("columnNames").and_then(|v| v.as_array())
+            && let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
                 let mut results = Vec::new();
 
                 // Find column indices
@@ -692,13 +693,11 @@ impl StarRocksClient {
                 for row in rows {
                     if let Some(row_array) = row.as_array() {
                         // Only include FINISHED sync MVs
-                        if let Some(state_idx) = state_idx {
-                            if let Some(state) = row_array.get(state_idx).and_then(|v| v.as_str()) {
-                                if state != "FINISHED" {
+                        if let Some(state_idx) = state_idx
+                            && let Some(state) = row_array.get(state_idx).and_then(|v| v.as_str())
+                                && state != "FINISHED" {
                                     continue; // Skip non-finished MVs
                                 }
-                            }
-                        }
 
                         // Extract values
                         let mv_name = rollup_name_idx
@@ -747,7 +746,6 @@ impl StarRocksClient {
 
                 return Ok(results);
             }
-        }
 
         Ok(Vec::new()) // Return empty if can't parse
     }

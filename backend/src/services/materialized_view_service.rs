@@ -48,19 +48,17 @@ impl MaterializedViewService {
                     
                     // Fetch async MVs
                     let sql_async = format!("SHOW MATERIALIZED VIEWS FROM `{}`", db);
-                    if let Ok(results) = mysql_client.query(&sql_async).await {
-                        if let Ok(async_mvs) = Self::parse_async_mv_results(results, &db) {
+                    if let Ok(results) = mysql_client.query(&sql_async).await
+                        && let Ok(async_mvs) = Self::parse_async_mv_results(results, &db) {
                             mvs.extend(async_mvs);
                         }
-                    }
                     
                     // Fetch sync MVs
                     let sql_sync = format!("SHOW ALTER MATERIALIZED VIEW FROM `{}`", db);
-                    if let Ok(results) = mysql_client.query(&sql_sync).await {
-                        if let Ok(sync_mvs) = Self::parse_sync_mv_results(results, &db) {
+                    if let Ok(results) = mysql_client.query(&sql_sync).await
+                        && let Ok(sync_mvs) = Self::parse_sync_mv_results(results, &db) {
                             mvs.extend(sync_mvs);
                         }
-                    }
                     
                     mvs
                 });
@@ -88,18 +86,16 @@ impl MaterializedViewService {
 
         for db in &databases {
             // Try async MVs
-            if let Ok(mvs) = self.get_async_mvs_from_db(db).await {
-                if let Some(mv) = mvs.into_iter().find(|m| m.name == mv_name) {
+            if let Ok(mvs) = self.get_async_mvs_from_db(db).await
+                && let Some(mv) = mvs.into_iter().find(|m| m.name == mv_name) {
                     return Ok(mv);
                 }
-            }
 
             // Try sync MVs
-            if let Ok(mvs) = self.get_sync_mvs_from_db(db).await {
-                if let Some(mv) = mvs.into_iter().find(|m| m.name == mv_name) {
+            if let Ok(mvs) = self.get_sync_mvs_from_db(db).await
+                && let Some(mv) = mvs.into_iter().find(|m| m.name == mv_name) {
                     return Ok(mv);
                 }
-            }
         }
 
         Err(ApiError::not_found(format!(
@@ -123,11 +119,10 @@ impl MaterializedViewService {
         let results = self.mysql_client.query(&sql).await?;
 
         // Extract DDL from result
-        if let Some(row) = results.first() {
-            if let Some(ddl) = row.get("Create Materialized View").and_then(|v| v.as_str()) {
+        if let Some(row) = results.first()
+            && let Some(ddl) = row.get("Create Materialized View").and_then(|v| v.as_str()) {
                 return Ok(ddl.to_string());
             }
-        }
 
         Err(ApiError::not_found(format!(
             "DDL for materialized view '{}' not found",
