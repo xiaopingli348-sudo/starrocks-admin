@@ -11,7 +11,7 @@ DIST_DIR := $(BUILD_DIR)/dist
 help:
 	@echo "StarRocks Admin - Build Commands:"
 	@echo ""
-	@echo "🔧 Code Quality:"
+	@echo "Code Quality:"
 	@echo "  make fmt          - Format code with rustfmt"
 	@echo "  make fmt-check    - Check code formatting"
 	@echo "  make clippy       - Run clippy checks (fix + strict)"
@@ -29,23 +29,23 @@ help:
 
 # Format code
 fmt:
-	@echo "🔧 Formatting code..."
+	@echo "[fmt] Formatting code..."
 	@cd $(BACKEND_DIR) && cargo fmt --all
 
 # Check code formatting
 fmt-check:
-	@echo "📝 Checking code formatting..."
+	@echo "[fmt-check] Checking code formatting..."
 	@cd $(BACKEND_DIR) && cargo fmt --all --check
 
 # Run clippy checks (following rustfs standard)
 clippy:
-	@echo "🔍 Running clippy checks..."
+	@echo "[clippy] Running clippy checks..."
 	@cd $(BACKEND_DIR) && DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --fix --allow-dirty --all-targets
 	@cd $(BACKEND_DIR) && DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --all-targets --all-features -- -D warnings
 
 # Run cargo check
 check:
-	@echo "🔨 Running cargo check..."
+	@echo "[check] Running cargo check..."
 	@cd $(BACKEND_DIR) && cargo check --all-targets
 
 # Legacy alias for clippy
@@ -53,7 +53,7 @@ lint: clippy
 
 # Run pre-commit checks (following rustfs standard)
 pre-commit: fmt clippy check
-	@echo "✅ All pre-commit checks passed!"
+	@echo "[pre-commit] All pre-commit checks passed!"
 
 # Build both backend and frontend (runs pre-commit first)
 build: pre-commit
