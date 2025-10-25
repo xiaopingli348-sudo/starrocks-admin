@@ -4,7 +4,7 @@
 
 use crate::services::{ClusterService, DataStatistics, DataStatisticsService, MetricsSnapshot};
 use crate::utils::{ApiError, ApiResult, ErrorCode};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -320,7 +320,7 @@ impl OverviewService {
         // Get last 7 days of disk usage data
         let cutoff = Utc::now() - chrono::Duration::days(7);
         
-        let snapshots = sqlx::query!(
+        let snapshots: Vec<(i64, i64, f64, NaiveDateTime)> = sqlx::query_as(
             r#"
             SELECT 
                 disk_total_bytes,
@@ -330,10 +330,10 @@ impl OverviewService {
             FROM metrics_snapshots
             WHERE cluster_id = ? AND collected_at >= ?
             ORDER BY collected_at ASC
-            "#,
-            cluster_id,
-            cutoff
+            "#
         )
+        .bind(cluster_id)
+        .bind(cutoff)
         .fetch_all(&self.db)
         .await?;
         
@@ -346,13 +346,13 @@ impl OverviewService {
         
         // Get latest values
         let latest = snapshots.last().unwrap();
-        let disk_total_bytes = latest.disk_total_bytes;
-        let disk_used_bytes = latest.disk_used_bytes;
-        let disk_usage_pct = latest.disk_usage_pct;
+        let disk_total_bytes = latest.0;
+        let disk_used_bytes = latest.1;
+        let disk_usage_pct = latest.2;
         
         // Perform linear regression on disk_used_bytes over time
         // y = disk_used_bytes, x = days since first snapshot
-        let first_time = snapshots.first().unwrap().collected_at.and_utc().timestamp();
+        let first_time = snapshots.first().unwrap().3.and_utc().timestamp();
         
         let mut sum_x = 0.0;
         let mut sum_y = 0.0;
@@ -361,8 +361,8 @@ impl OverviewService {
         let n = snapshots.len() as f64;
         
         for snapshot in &snapshots {
-            let x = (snapshot.collected_at.and_utc().timestamp() - first_time) as f64 / 86400.0; // days
-            let y = snapshot.disk_used_bytes as f64;
+            let x = (snapshot.3.and_utc().timestamp() - first_time) as f64 / 86400.0; // days
+            let y = snapshot.1 as f64;
             
             sum_x += x;
             sum_y += y;
@@ -414,15 +414,60 @@ impl OverviewService {
 
     /// Get the latest snapshot for a cluster
     async fn get_latest_snapshot(&self, cluster_id: i64) -> ApiResult<Option<MetricsSnapshot>> {
-        let row = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct SnapshotRow {
+            cluster_id: i64,
+            collected_at: NaiveDateTime,
+            qps: f64,
+            rps: f64,
+            query_latency_p50: f64,
+            query_latency_p95: f64,
+            query_latency_p99: f64,
+            query_total: i64,
+            query_success: i64,
+            query_error: i64,
+            query_timeout: i64,
+            backend_total: i64,
+            backend_alive: i64,
+            frontend_total: i64,
+            frontend_alive: i64,
+            total_cpu_usage: f64,
+            avg_cpu_usage: f64,
+            total_memory_usage: f64,
+            avg_memory_usage: f64,
+            disk_total_bytes: i64,
+            disk_used_bytes: i64,
+            disk_usage_pct: f64,
+            tablet_count: i64,
+            max_compaction_score: f64,
+            txn_running: i64,
+            txn_success_total: i64,
+            txn_failed_total: i64,
+            load_running: i64,
+            load_finished_total: i64,
+            jvm_heap_total: i64,
+            jvm_heap_used: i64,
+            jvm_heap_usage_pct: f64,
+            jvm_thread_count: i64,
+            network_bytes_sent_total: i64,
+            network_bytes_received_total: i64,
+            network_send_rate: f64,
+            network_receive_rate: f64,
+            io_read_bytes_total: i64,
+            io_write_bytes_total: i64,
+            io_read_rate: f64,
+            io_write_rate: f64,
+        }
+
+        let row: Option<SnapshotRow> = sqlx::query_as(
             r#"
             SELECT * FROM metrics_snapshots
             WHERE cluster_id = ?
             ORDER BY collected_at DESC
             LIMIT 1
-            "#,
-            cluster_id
+            "#
         )
+        .bind(cluster_id)
         .fetch_optional(&self.db)
         .await?;
         
@@ -481,20 +526,65 @@ impl OverviewService {
         cluster_id: i64,
         time_range: &TimeRange,
     ) -> ApiResult<Vec<MetricsSnapshot>> {
+        #[derive(sqlx::FromRow)]
+        struct SnapshotRow {
+            cluster_id: i64,
+            collected_at: NaiveDateTime,
+            qps: f64,
+            rps: f64,
+            query_latency_p50: f64,
+            query_latency_p95: f64,
+            query_latency_p99: f64,
+            query_total: i64,
+            query_success: i64,
+            query_error: i64,
+            query_timeout: i64,
+            backend_total: i64,
+            backend_alive: i64,
+            frontend_total: i64,
+            frontend_alive: i64,
+            total_cpu_usage: f64,
+            avg_cpu_usage: f64,
+            total_memory_usage: f64,
+            avg_memory_usage: f64,
+            disk_total_bytes: i64,
+            disk_used_bytes: i64,
+            disk_usage_pct: f64,
+            tablet_count: i64,
+            max_compaction_score: f64,
+            txn_running: i64,
+            txn_success_total: i64,
+            txn_failed_total: i64,
+            load_running: i64,
+            load_finished_total: i64,
+            jvm_heap_total: i64,
+            jvm_heap_used: i64,
+            jvm_heap_usage_pct: f64,
+            jvm_thread_count: i64,
+            network_bytes_sent_total: i64,
+            network_bytes_received_total: i64,
+            network_send_rate: f64,
+            network_receive_rate: f64,
+            io_read_bytes_total: i64,
+            io_write_bytes_total: i64,
+            io_read_rate: f64,
+            io_write_rate: f64,
+        }
+
         let start_time = time_range.start_time();
         let end_time = time_range.end_time();
         
-        let rows = sqlx::query!(
+        let rows: Vec<SnapshotRow> = sqlx::query_as(
             r#"
             SELECT * FROM metrics_snapshots
             WHERE cluster_id = ? 
               AND collected_at BETWEEN ? AND ?
             ORDER BY collected_at ASC
-            "#,
-            cluster_id,
-            start_time,
-            end_time
+            "#
         )
+        .bind(cluster_id)
+        .bind(start_time)
+        .bind(end_time)
         .fetch_all(&self.db)
         .await?;
         

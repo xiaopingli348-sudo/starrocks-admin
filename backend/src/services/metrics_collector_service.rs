@@ -113,14 +113,14 @@ impl MetricsCollectorService {
         let yesterday = today - chrono::Duration::days(1);
         
         // Check if yesterday's data has been aggregated
-        let exists = sqlx::query!(
-            "SELECT COUNT(*) as count FROM daily_snapshots WHERE snapshot_date = ?",
-            yesterday
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) as count FROM daily_snapshots WHERE snapshot_date = ?"
         )
+        .bind(yesterday)
         .fetch_one(&self.db)
         .await?;
         
-        if exists.count == 0 {
+        if count.0 == 0 {
             tracing::info!("Running daily aggregation for date: {}", yesterday);
             self.run_daily_aggregation_all_clusters().await?;
         }
@@ -324,7 +324,7 @@ impl MetricsCollectorService {
 
     /// Save metrics snapshot to database
     async fn save_snapshot(&self, snapshot: &MetricsSnapshot) -> ApiResult<()> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO metrics_snapshots (
                 cluster_id, collected_at,
@@ -353,49 +353,49 @@ impl MetricsCollectorService {
                 ?, ?, ?, ?,
                 ?, ?, ?, ?
             )
-            "#,
-            snapshot.cluster_id,
-            snapshot.collected_at,
-            snapshot.qps,
-            snapshot.rps,
-            snapshot.query_latency_p50,
-            snapshot.query_latency_p95,
-            snapshot.query_latency_p99,
-            snapshot.query_total,
-            snapshot.query_success,
-            snapshot.query_error,
-            snapshot.query_timeout,
-            snapshot.backend_total,
-            snapshot.backend_alive,
-            snapshot.frontend_total,
-            snapshot.frontend_alive,
-            snapshot.total_cpu_usage,
-            snapshot.avg_cpu_usage,
-            snapshot.total_memory_usage,
-            snapshot.avg_memory_usage,
-            snapshot.disk_total_bytes,
-            snapshot.disk_used_bytes,
-            snapshot.disk_usage_pct,
-            snapshot.tablet_count,
-            snapshot.max_compaction_score,
-            snapshot.txn_running,
-            snapshot.txn_success_total,
-            snapshot.txn_failed_total,
-            snapshot.load_running,
-            snapshot.load_finished_total,
-            snapshot.jvm_heap_total,
-            snapshot.jvm_heap_used,
-            snapshot.jvm_heap_usage_pct,
-            snapshot.jvm_thread_count,
-            snapshot.network_bytes_sent_total,
-            snapshot.network_bytes_received_total,
-            snapshot.network_send_rate,
-            snapshot.network_receive_rate,
-            snapshot.io_read_bytes_total,
-            snapshot.io_write_bytes_total,
-            snapshot.io_read_rate,
-            snapshot.io_write_rate
+            "#
         )
+        .bind(snapshot.cluster_id)
+        .bind(snapshot.collected_at)
+        .bind(snapshot.qps)
+        .bind(snapshot.rps)
+        .bind(snapshot.query_latency_p50)
+        .bind(snapshot.query_latency_p95)
+        .bind(snapshot.query_latency_p99)
+        .bind(snapshot.query_total)
+        .bind(snapshot.query_success)
+        .bind(snapshot.query_error)
+        .bind(snapshot.query_timeout)
+        .bind(snapshot.backend_total)
+        .bind(snapshot.backend_alive)
+        .bind(snapshot.frontend_total)
+        .bind(snapshot.frontend_alive)
+        .bind(snapshot.total_cpu_usage)
+        .bind(snapshot.avg_cpu_usage)
+        .bind(snapshot.total_memory_usage)
+        .bind(snapshot.avg_memory_usage)
+        .bind(snapshot.disk_total_bytes)
+        .bind(snapshot.disk_used_bytes)
+        .bind(snapshot.disk_usage_pct)
+        .bind(snapshot.tablet_count)
+        .bind(snapshot.max_compaction_score)
+        .bind(snapshot.txn_running)
+        .bind(snapshot.txn_success_total)
+        .bind(snapshot.txn_failed_total)
+        .bind(snapshot.load_running)
+        .bind(snapshot.load_finished_total)
+        .bind(snapshot.jvm_heap_total)
+        .bind(snapshot.jvm_heap_used)
+        .bind(snapshot.jvm_heap_usage_pct)
+        .bind(snapshot.jvm_thread_count)
+        .bind(snapshot.network_bytes_sent_total)
+        .bind(snapshot.network_bytes_received_total)
+        .bind(snapshot.network_send_rate)
+        .bind(snapshot.network_receive_rate)
+        .bind(snapshot.io_read_bytes_total)
+        .bind(snapshot.io_write_bytes_total)
+        .bind(snapshot.io_read_rate)
+        .bind(snapshot.io_write_rate)
         .execute(&self.db)
         .await?;
         
@@ -406,10 +406,10 @@ impl MetricsCollectorService {
     async fn cleanup_old_metrics(&self) -> Result<(), sqlx::Error> {
         let cutoff_date = Utc::now() - chrono::Duration::days(self.retention_days);
         
-        let result = sqlx::query!(
-            "DELETE FROM metrics_snapshots WHERE collected_at < ?",
-            cutoff_date
+        let result = sqlx::query(
+            "DELETE FROM metrics_snapshots WHERE collected_at < ?"
         )
+        .bind(cutoff_date)
         .execute(&self.db)
         .await?;
         
@@ -426,15 +426,60 @@ impl MetricsCollectorService {
 
     /// Get the latest snapshot for a cluster
     pub async fn get_latest_snapshot(&self, cluster_id: i64) -> ApiResult<Option<MetricsSnapshot>> {
-        let row = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct SnapshotRow {
+            cluster_id: i64,
+            collected_at: chrono::NaiveDateTime,
+            qps: f64,
+            rps: f64,
+            query_latency_p50: f64,
+            query_latency_p95: f64,
+            query_latency_p99: f64,
+            query_total: i64,
+            query_success: i64,
+            query_error: i64,
+            query_timeout: i64,
+            backend_total: i64,
+            backend_alive: i64,
+            frontend_total: i64,
+            frontend_alive: i64,
+            total_cpu_usage: f64,
+            avg_cpu_usage: f64,
+            total_memory_usage: f64,
+            avg_memory_usage: f64,
+            disk_total_bytes: i64,
+            disk_used_bytes: i64,
+            disk_usage_pct: f64,
+            tablet_count: i64,
+            max_compaction_score: f64,
+            txn_running: i64,
+            txn_success_total: i64,
+            txn_failed_total: i64,
+            load_running: i64,
+            load_finished_total: i64,
+            jvm_heap_total: i64,
+            jvm_heap_used: i64,
+            jvm_heap_usage_pct: f64,
+            jvm_thread_count: i64,
+            network_bytes_sent_total: i64,
+            network_bytes_received_total: i64,
+            network_send_rate: f64,
+            network_receive_rate: f64,
+            io_read_bytes_total: i64,
+            io_write_bytes_total: i64,
+            io_read_rate: f64,
+            io_write_rate: f64,
+        }
+
+        let row: Option<SnapshotRow> = sqlx::query_as(
             r#"
             SELECT * FROM metrics_snapshots
             WHERE cluster_id = ?
             ORDER BY collected_at DESC
             LIMIT 1
-            "#,
-            cluster_id
+            "#
         )
+        .bind(cluster_id)
         .fetch_optional(&self.db)
         .await?;
         
@@ -550,7 +595,7 @@ impl MetricsCollectorService {
         );
         
         // Query all snapshots from yesterday
-        let snapshots = sqlx::query!(
+        let snapshots: (Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<i64>, Option<i64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<i64>) = sqlx::query_as(
             r#"
             SELECT
                 AVG(qps) as avg_qps,
@@ -572,17 +617,17 @@ impl MetricsCollectorService {
             WHERE cluster_id = ?
                 AND collected_at >= ?
                 AND collected_at <= ?
-            "#,
-            cluster_id,
-            yesterday_start,
-            yesterday_end
+            "#
         )
+        .bind(cluster_id)
+        .bind(yesterday_start)
+        .bind(yesterday_end)
         .fetch_one(&self.db)
         .await?;
         
         // Calculate derived metrics
-        let total_queries = snapshots.total_queries.unwrap_or(0);
-        let total_errors = snapshots.total_errors.unwrap_or(0);
+        let total_queries = snapshots.5.unwrap_or(0);
+        let total_errors = snapshots.6.unwrap_or(0);
         let error_rate = if total_queries > 0 {
             (total_errors as f64 / total_queries as f64) * 100.0
         } else {
@@ -590,22 +635,22 @@ impl MetricsCollectorService {
         };
         
         // Prepare values (to avoid temporary value lifetime issues)
-        let avg_qps = snapshots.avg_qps.unwrap_or(0.0);
-        let max_qps = snapshots.max_qps.unwrap_or(0.0);
-        let min_qps = snapshots.min_qps.unwrap_or(0.0);
-        let avg_latency_p99 = snapshots.avg_latency_p99.unwrap_or(0.0);
-        let max_latency_p99 = snapshots.max_latency_p99.unwrap_or(0.0);
-        let avg_cpu_usage = snapshots.avg_cpu_usage.unwrap_or(0.0);
-        let max_cpu_usage = snapshots.max_cpu_usage.unwrap_or(0.0);
-        let avg_memory_usage = snapshots.avg_memory_usage.unwrap_or(0.0);
-        let max_memory_usage = snapshots.max_memory_usage.unwrap_or(0.0);
-        let avg_disk_usage_pct = snapshots.avg_disk_usage_pct.unwrap_or(0.0);
-        let max_disk_usage_pct = snapshots.max_disk_usage_pct.unwrap_or(0.0);
-        let data_size_end = snapshots.avg_disk_used_bytes.unwrap_or(0) as i64;
+        let avg_qps = snapshots.0.unwrap_or(0.0);
+        let max_qps = snapshots.1.unwrap_or(0.0);
+        let min_qps = snapshots.2.unwrap_or(0.0);
+        let avg_latency_p99 = snapshots.3.unwrap_or(0.0);
+        let max_latency_p99 = snapshots.4.unwrap_or(0.0);
+        let avg_cpu_usage = snapshots.7.unwrap_or(0.0);
+        let max_cpu_usage = snapshots.8.unwrap_or(0.0);
+        let avg_memory_usage = snapshots.9.unwrap_or(0.0);
+        let max_memory_usage = snapshots.10.unwrap_or(0.0);
+        let avg_disk_usage_pct = snapshots.11.unwrap_or(0.0);
+        let max_disk_usage_pct = snapshots.12.unwrap_or(0.0);
+        let data_size_end = snapshots.13.unwrap_or(0.0) as i64;
         let data_growth_bytes = 0i64; // Would need previous day's value
         
         // Insert or update daily snapshot
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO daily_snapshots (
                 cluster_id, snapshot_date,
@@ -634,26 +679,26 @@ impl MetricsCollectorService {
                 max_disk_usage_pct = excluded.max_disk_usage_pct,
                 data_size_end = excluded.data_size_end,
                 data_growth_bytes = excluded.data_growth_bytes
-            "#,
-            cluster_id,
-            yesterday,
-            avg_qps,
-            max_qps,
-            min_qps,
-            avg_latency_p99,
-            max_latency_p99,
-            total_queries,
-            total_errors,
-            error_rate,
-            avg_cpu_usage,
-            max_cpu_usage,
-            avg_memory_usage,
-            max_memory_usage,
-            avg_disk_usage_pct,
-            max_disk_usage_pct,
-            data_size_end,
-            data_growth_bytes
+            "#
         )
+        .bind(cluster_id)
+        .bind(yesterday)
+        .bind(avg_qps)
+        .bind(max_qps)
+        .bind(min_qps)
+        .bind(avg_latency_p99)
+        .bind(max_latency_p99)
+        .bind(total_queries)
+        .bind(total_errors)
+        .bind(error_rate)
+        .bind(avg_cpu_usage)
+        .bind(max_cpu_usage)
+        .bind(avg_memory_usage)
+        .bind(max_memory_usage)
+        .bind(avg_disk_usage_pct)
+        .bind(max_disk_usage_pct)
+        .bind(data_size_end)
+        .bind(data_growth_bytes)
         .execute(&self.db)
         .await?;
         
@@ -670,10 +715,10 @@ impl MetricsCollectorService {
     async fn cleanup_old_daily_snapshots(&self) -> Result<(), sqlx::Error> {
         let cutoff_date = Utc::now().date_naive() - chrono::Duration::days(90);
         
-        let result = sqlx::query!(
-            "DELETE FROM daily_snapshots WHERE snapshot_date < ?",
-            cutoff_date
+        let result = sqlx::query(
+            "DELETE FROM daily_snapshots WHERE snapshot_date < ?"
         )
+        .bind(cutoff_date)
         .execute(&self.db)
         .await?;
         
