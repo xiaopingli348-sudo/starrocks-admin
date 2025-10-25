@@ -5,7 +5,7 @@
 use crate::models::Cluster;
 use crate::services::{AuditLogService, ClusterService, MaterializedViewService, MySQLClient, MySQLPoolManager, StarRocksClient};
 use crate::utils::ApiResult;
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -155,13 +155,36 @@ impl DataStatisticsService {
 
     /// Get cached data statistics for a cluster
     pub async fn get_statistics(&self, cluster_id: i64) -> ApiResult<Option<DataStatistics>> {
-        let row = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct DataStatisticsRow {
+            cluster_id: i64,
+            updated_at: NaiveDateTime,
+            database_count: i64,
+            table_count: i64,
+            total_data_size: i64,
+            total_index_size: i64,
+            top_tables_by_size: Option<String>,
+            top_tables_by_access: Option<String>,
+            mv_total: i64,
+            mv_running: i64,
+            mv_failed: i64,
+            mv_success: i64,
+            schema_change_running: i64,
+            schema_change_pending: i64,
+            schema_change_finished: i64,
+            schema_change_failed: i64,
+            active_users_1h: i64,
+            active_users_24h: i64,
+            unique_users: Option<String>,
+        }
+
+        let row: Option<DataStatisticsRow> = sqlx::query_as(
             r#"
             SELECT * FROM data_statistics
             WHERE cluster_id = ?
-            "#,
-            cluster_id
+            "#
         )
+        .bind(cluster_id)
         .fetch_optional(&self.db)
         .await?;
         
@@ -341,7 +364,7 @@ impl DataStatisticsService {
         let top_tables_by_access_json = serde_json::to_string(&stats.top_tables_by_access)?;
         let unique_users_json = serde_json::to_string(&stats.unique_users)?;
         
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO data_statistics (
                 cluster_id, updated_at,
@@ -371,27 +394,27 @@ impl DataStatisticsService {
                 active_users_1h = excluded.active_users_1h,
                 active_users_24h = excluded.active_users_24h,
                 unique_users = excluded.unique_users
-            "#,
-            stats.cluster_id,
-            stats.updated_at,
-            stats.database_count,
-            stats.table_count,
-            stats.total_data_size,
-            stats.total_index_size,
-            top_tables_by_size_json,
-            top_tables_by_access_json,
-            stats.mv_total,
-            stats.mv_running,
-            stats.mv_failed,
-            stats.mv_success,
-            stats.schema_change_running,
-            stats.schema_change_pending,
-            stats.schema_change_finished,
-            stats.schema_change_failed,
-            stats.active_users_1h,
-            stats.active_users_24h,
-            unique_users_json
+            "#
         )
+        .bind(stats.cluster_id)
+        .bind(stats.updated_at)
+        .bind(stats.database_count)
+        .bind(stats.table_count)
+        .bind(stats.total_data_size)
+        .bind(stats.total_index_size)
+        .bind(top_tables_by_size_json)
+        .bind(top_tables_by_access_json)
+        .bind(stats.mv_total)
+        .bind(stats.mv_running)
+        .bind(stats.mv_failed)
+        .bind(stats.mv_success)
+        .bind(stats.schema_change_running)
+        .bind(stats.schema_change_pending)
+        .bind(stats.schema_change_finished)
+        .bind(stats.schema_change_failed)
+        .bind(stats.active_users_1h)
+        .bind(stats.active_users_24h)
+        .bind(unique_users_json)
         .execute(&self.db)
         .await?;
         
