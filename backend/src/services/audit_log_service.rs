@@ -130,7 +130,7 @@ impl AuditLogService {
                 // Split database.table if present
                 let (final_db, final_table) = if table.contains('.') {
                     let parts: Vec<&str> = table.splitn(2, '.').collect();
-                    let table_ref: &str = &table;
+                    let table_ref: &str = table;
                     (parts[0].to_string(), parts.get(1).copied().unwrap_or(table_ref).to_string())
                 } else {
                     (database.to_string(), table.to_string())

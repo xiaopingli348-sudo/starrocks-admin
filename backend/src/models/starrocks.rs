@@ -224,6 +224,7 @@ pub struct Table {
 
 // Detailed table information (from information_schema.tables)
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[allow(dead_code)]
 pub struct TableInfo {
     pub table_schema: String,
     pub table_name: String,

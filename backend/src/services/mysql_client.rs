@@ -218,7 +218,7 @@ mod tests {
         let pool = create_test_pool().await;
         let client = MySQLClient::from_pool(pool);
 
-        let (columns, rows) = client.query("SELECT 1").await.unwrap();
+        let (columns, rows) = client.query_raw("SELECT 1").await.unwrap();
         assert_eq!(columns.len(), 1);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], "1");
@@ -229,7 +229,7 @@ mod tests {
         let pool = create_test_pool().await;
         let client = MySQLClient::from_pool(pool);
 
-        let (_columns, rows) = client.query("SELECT 'hello'").await.unwrap();
+        let (_columns, rows) = client.query_raw("SELECT 'hello'").await.unwrap();
         assert_eq!(rows[0][0], "hello");
     }
 
@@ -245,7 +245,7 @@ mod tests {
 
         for _i in 1..=50 {
             let sql = format!("SELECT get_query_profile('{}')", query_id);
-            let result = client.query(&sql).await;
+            let result = client.query_raw(&sql).await;
             
             match result {
                 Ok((_, rows)) => {
@@ -274,7 +274,7 @@ mod tests {
         
         // Test the actual problematic query
         let sql = "select * from information_schema.partitions_meta order by Max_CS LIMIT 5";
-        let result = client.query(sql).await;
+        let result = client.query_raw(sql).await;
         
         match result {
             Ok((columns, rows)) => {

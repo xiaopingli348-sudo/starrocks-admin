@@ -23,6 +23,7 @@ pub trait ScheduledTask: Send + Sync + 'static {
     }
 
     /// Get task name for logging
+    #[allow(dead_code)]
     fn name(&self) -> &str;
 }
 
@@ -146,10 +147,12 @@ impl ScheduledExecutor {
 
 /// Handle to control a scheduled executor
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct ScheduledExecutorHandle {
     shutdown: Arc<AtomicBool>,
 }
 
+#[allow(dead_code)]
 impl ScheduledExecutorHandle {
     /// Signal the executor to shutdown
     pub fn shutdown(&self) {
