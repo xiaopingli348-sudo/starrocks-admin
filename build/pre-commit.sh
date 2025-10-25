@@ -5,20 +5,20 @@
 
 set -e
 
-echo "🔧 Running pre-commit checks..."
+echo "[pre-commit] Running pre-commit checks..."
 cd backend
 
 # 1. Format code
-echo "📝 Formatting code..."
+echo "[pre-commit] Formatting code..."
 cargo fmt --all
 
 # 2. Run clippy (fix + strict check)
-echo "🔍 Running clippy checks..."
+echo "[pre-commit] Running clippy checks..."
 DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --fix --allow-dirty --allow-staged --allow-no-vcs --all-targets
 DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --all-targets --all-features -- -D warnings
 
 # 3. Run cargo check
-echo "🔨 Running cargo check..."
+echo "[pre-commit] Running cargo check..."
 cargo check --all-targets
 
-echo "✅ All pre-commit checks passed!"
+echo "[pre-commit] All pre-commit checks passed!"

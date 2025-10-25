@@ -63,3 +63,7 @@ validator = { version = "0.18", features = ["derive"] }
 # Regex
 regex = "1.10"
 
+[dev-dependencies]
+# Git hooks management (only install hooks, no runtime dependency)
+cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
+
