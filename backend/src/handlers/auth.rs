@@ -1,7 +1,7 @@
 use axum::{extract::State, Json};
 use std::sync::Arc;
 
-use crate::models::{CreateUserRequest, LoginRequest, LoginResponse, UserResponse};
+use crate::models::{CreateUserRequest, UpdateUserRequest, LoginRequest, LoginResponse, UserResponse};
 use crate::services::AuthService;
 use crate::utils::ApiResult;
 
@@ -82,6 +82,36 @@ pub async fn get_me(
     let user = auth_service.get_user_by_id(user_id).await?;
     
     tracing::debug!("User info retrieved successfully: {} (ID: {})", user.username, user.id);
+    Ok(Json(user.into()))
+}
+
+// Update current user info
+#[utoipa::path(
+    put,
+    path = "/api/auth/me",
+    request_body = UpdateUserRequest,
+    responses(
+        (status = 200, description = "User updated successfully", body = UserResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 400, description = "Bad request")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Authentication"
+)]
+pub async fn update_me(
+    State(auth_service): State<AuthServiceState>,
+    axum::extract::Extension(user_id): axum::extract::Extension<i64>,
+    Json(req): Json<UpdateUserRequest>,
+) -> ApiResult<Json<UserResponse>> {
+    tracing::info!("User update attempt for user_id: {}", user_id);
+    tracing::debug!("Update request: email={:?}, avatar={:?}, changing_password={}",
+        req.email, req.avatar, req.new_password.is_some());
+    
+    let user = auth_service.update_user(user_id, req).await?;
+    
+    tracing::info!("User updated successfully: {} (ID: {})", user.username, user.id);
     Ok(Json(user.into()))
 }
 

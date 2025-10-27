@@ -13,6 +13,11 @@ const routes: Routes = [{
         .then(m => m.StarRocksModule),
     },
     {
+      path: 'user-settings',
+      loadChildren: () => import('./user-settings/user-settings.module')
+        .then(m => m.UserSettingsModule),
+    },
+    {
       path: '',
       redirectTo: 'starrocks',
       pathMatch: 'full',

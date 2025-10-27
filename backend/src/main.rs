@@ -253,6 +253,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Auth route
     let auth_routes = Router::new()
         .route("/api/auth/me", get(handlers::auth::get_me))
+        .route("/api/auth/me", put(handlers::auth::update_me))
         .with_state(auth_service.clone());
 
     let protected_routes = Router::new()

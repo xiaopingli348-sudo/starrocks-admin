@@ -40,7 +40,6 @@ export class HeaderComponent implements OnInit, OnDestroy {
   currentTheme = 'default';
 
   userMenu = [
-    { title: '个人资料', icon: 'person-outline', data: { id: 'profile' } },
     { title: '用户设置', icon: 'settings-outline', data: { id: 'settings' } },
     { title: '退出登录', icon: 'log-out-outline', data: { id: 'logout' } },
   ];
@@ -67,7 +66,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
         if (currentUser) {
           this.user = {
             name: currentUser.username || 'admin',
-            picture: 'assets/images/nick.png', // 使用默认头像
+            picture: currentUser.avatar || 'assets/images/nick.png', // 使用用户的头像，如果没有则使用默认头像
           };
         } else {
           // 如果未登录，设置默认用户
@@ -88,11 +87,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
       .subscribe(item => {
         if (item.data) {
           switch (item.data.id) {
-            case 'profile':
-              this.toastr.info('个人资料功能开发中', '提示');
-              break;
             case 'settings':
-              this.toastr.info('用户设置功能开发中', '提示');
+              this.router.navigate(['/pages/user-settings']);
               break;
             case 'logout':
               this.logout();
@@ -139,7 +135,9 @@ export class HeaderComponent implements OnInit, OnDestroy {
   }
 
   logout() {
-    this.authService.logout();
     this.toastr.success('退出登录成功', '提示');
+    setTimeout(() => {
+      this.authService.logout();
+    }, 500);
   }
 }

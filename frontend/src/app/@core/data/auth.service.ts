@@ -8,6 +8,7 @@ export interface User {
   id: number;
   username: string;
   email?: string;
+  avatar?: string;
   created_at: string;
 }
 
@@ -81,6 +82,12 @@ export class AuthService {
 
   getMe(): Observable<User> {
     return this.api.get<User>('/auth/me');
+  }
+
+  // Update current user info in BehaviorSubject
+  updateCurrentUser(user: User): void {
+    localStorage.setItem('current_user', JSON.stringify(user));
+    this.currentUserSubject.next(user);
   }
 }
 

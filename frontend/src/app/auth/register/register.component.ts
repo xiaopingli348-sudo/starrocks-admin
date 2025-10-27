@@ -14,17 +14,35 @@ export class RegisterComponent {
     username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    avatar: ''
   };
   errors: string[] = [];
   messages: string[] = [];
   showMessages = false;
 
+  // 可用的头像列表
+  availableAvatars = [
+    'assets/images/nick.png',
+    'assets/images/eva.png',
+    'assets/images/jack.png',
+    'assets/images/kate.png',
+    'assets/images/lee.png',
+    'assets/images/alan.png',
+  ];
+
   constructor(
     protected router: Router,
     private authService: AuthService,
     private toastrService: NbToastrService
-  ) {}
+  ) {
+    // 随机选择一个头像
+    this.user.avatar = this.availableAvatars[Math.floor(Math.random() * this.availableAvatars.length)];
+  }
+
+  selectAvatar(avatar: string) {
+    this.user.avatar = avatar;
+  }
 
   register(): void {
     this.errors = [];
@@ -53,7 +71,8 @@ export class RegisterComponent {
     const registerData = {
       username: this.user.username,
       email: this.user.email,
-      password: this.user.password
+      password: this.user.password,
+      avatar: this.user.avatar
     };
 
     this.authService.register(registerData).subscribe({

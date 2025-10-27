@@ -1,4 +1,4 @@
-use crate::models::{CreateUserRequest, LoginRequest, User};
+use crate::models::{CreateUserRequest, UpdateUserRequest, LoginRequest, User};
 use crate::utils::{ApiError, ApiResult, JwtUtil};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use sqlx::SqlitePool;
@@ -44,11 +44,12 @@ impl AuthService {
         tracing::debug!("Inserting user into database: {}", req.username);
         // Insert user
         let result = sqlx::query(
-            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            "INSERT INTO users (username, password_hash, email, avatar) VALUES (?, ?, ?, ?)",
         )
         .bind(&req.username)
         .bind(&password_hash)
         .bind(&req.email)
+        .bind(&req.avatar)
         .execute(&self.pool)
         .await?;
 
@@ -119,6 +120,75 @@ impl AuthService {
                 "User not found",
             )
         })
+    }
+
+    // Update user information
+    pub async fn update_user(&self, user_id: i64, req: UpdateUserRequest) -> ApiResult<User> {
+        tracing::debug!("Updating user information for user_id: {}", user_id);
+        
+        // Get current user
+        let user = self.get_user_by_id(user_id).await?;
+
+        // If changing password, verify current password first
+        if let (Some(current_pwd), Some(new_pwd)) = (&req.current_password, &req.new_password) {
+            tracing::debug!("Verifying current password for user_id: {}", user_id);
+            let valid = verify(current_pwd, &user.password_hash)
+                .map_err(|e| {
+                    tracing::error!("Password verification error: {}", e);
+                    ApiError::internal_error(format!("Password verification failed: {}", e))
+                })?;
+
+            if !valid {
+                tracing::warn!("Current password verification failed for user_id: {}", user_id);
+                return Err(ApiError::new(
+                    crate::utils::ErrorCode::ValidationError,
+                    "Current password is incorrect",
+                ));
+            }
+
+            // Hash new password
+            tracing::debug!("Hashing new password for user_id: {}", user_id);
+            let new_password_hash = hash(new_pwd, DEFAULT_COST)
+                .map_err(|e| {
+                    tracing::error!("Password hashing failed: {}", e);
+                    ApiError::internal_error(format!("Failed to hash password: {}", e))
+                })?;
+
+            // Update password
+            sqlx::query("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                .bind(&new_password_hash)
+                .bind(user_id)
+                .execute(&self.pool)
+                .await?;
+            
+            tracing::info!("Password updated successfully for user_id: {}", user_id);
+        }
+
+        // Update email if provided
+        if let Some(email) = &req.email {
+            tracing::debug!("Updating email for user_id: {}", user_id);
+            sqlx::query("UPDATE users SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                .bind(email)
+                .bind(user_id)
+                .execute(&self.pool)
+                .await?;
+        }
+
+        // Update avatar if provided
+        if let Some(avatar) = &req.avatar {
+            tracing::debug!("Updating avatar for user_id: {}", user_id);
+            sqlx::query("UPDATE users SET avatar = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                .bind(avatar)
+                .bind(user_id)
+                .execute(&self.pool)
+                .await?;
+        }
+
+        // Fetch and return updated user
+        let updated_user = self.get_user_by_id(user_id).await?;
+        tracing::info!("User updated successfully: {} (ID: {})", updated_user.username, updated_user.id);
+
+        Ok(updated_user)
     }
 }
 
