@@ -119,7 +119,7 @@ export class ClusterFormComponent implements OnInit {
           this.testConnectionAfterCreate(cluster.id);
         } else {
           this.toastrService.success('集群更新成功', '成功');
-          this.router.navigate(['/pages/starrocks/clusters']);
+          this.router.navigate(['/pages/starrocks/dashboard']);
         }
       },
       error: (error) => {
@@ -142,17 +142,17 @@ export class ClusterFormComponent implements OnInit {
         } else {
           this.toastrService.warning('集群已创建，但健康检查失败。请检查配置', '警告');
         }
-        this.router.navigate(['/pages/starrocks/clusters']);
+        this.router.navigate(['/pages/starrocks/dashboard']);
       },
       error: () => {
         this.toastrService.warning('集群已创建，但健康检查失败。请检查配置', '警告');
-        this.router.navigate(['/pages/starrocks/clusters']);
+        this.router.navigate(['/pages/starrocks/dashboard']);
       },
     });
   }
 
   onCancel(): void {
-    this.router.navigate(['/pages/starrocks/clusters']);
+    this.router.navigate(['/pages/starrocks/dashboard']);
   }
 
   testConnection(): void {

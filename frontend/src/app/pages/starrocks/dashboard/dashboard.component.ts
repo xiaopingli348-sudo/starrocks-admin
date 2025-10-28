@@ -164,6 +164,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.router.navigate(['/pages/starrocks/clusters/new']);
   }
 
+  editCluster(cluster: Cluster): void {
+    this.router.navigate(['/pages/starrocks/clusters', cluster.id, 'edit']);
+  }
+
+  deleteCluster(cluster: Cluster): void {
+    if (confirm(`确定要删除集群 "${cluster.name}" 吗？`)) {
+      this.clusterService.deleteCluster(cluster.id).subscribe({
+        next: () => {
+          this.toastrService.success(`集群 "${cluster.name}" 已删除`, '成功');
+          this.loadClusters(); // 重新加载集群列表
+        },
+        error: (error) => {
+          this.handleError(error);
+        }
+      });
+    }
+  }
+
   private handleError(error: any): void {
     console.error('Error:', error);
     this.toastrService.danger(

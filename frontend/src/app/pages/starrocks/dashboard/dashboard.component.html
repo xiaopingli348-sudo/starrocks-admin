@@ -4,7 +4,7 @@
       <nb-card-header>
         <div class="d-flex justify-content-between align-items-center">
           <h5>StarRocks 集群概览</h5>
-          <button nbButton status="primary" (click)="addCluster()">
+          <button nbButton ghost size="small" status="primary" (click)="addCluster()">
             <nb-icon icon="plus-outline"></nb-icon>
             添加集群
           </button>
@@ -22,7 +22,9 @@
 
         <div *ngIf="!loading && clusters.length > 0" class="row">
           <div *ngFor="let clusterCard of clusters" class="col-md-6 col-lg-4 mb-3">
-            <nb-card [status]="getStatusColor(clusterCard.health?.status)" [accent]="clusterCard.health?.status === 'healthy' ? 'success' : null">
+            <nb-card 
+              [status]="getStatusColor(clusterCard.health?.status)"
+              class="cluster-card">
               <nb-card-header>
                 <div class="d-flex justify-content-between align-items-center">
                   <div class="d-flex align-items-center gap-2">
@@ -35,6 +37,33 @@
                     ></nb-badge>
                   </div>
                   <div class="d-flex align-items-center gap-2">
+                    <!-- 编辑按钮 -->
+                    <button 
+                      nbButton 
+                      ghost
+                      size="tiny"
+                      status="basic"
+                      (click)="editCluster(clusterCard.cluster)"
+                      nbTooltip="编辑集群"
+                      nbTooltipPlacement="top"
+                    >
+                      <nb-icon icon="edit-outline"></nb-icon>
+                    </button>
+                    
+                    <!-- 删除按钮 -->
+                    <button 
+                      nbButton 
+                      ghost
+                      size="tiny"
+                      status="danger"
+                      (click)="deleteCluster(clusterCard.cluster)"
+                      nbTooltip="删除集群"
+                      nbTooltipPlacement="top"
+                    >
+                      <nb-icon icon="trash-2-outline"></nb-icon>
+                    </button>
+                    
+                    <!-- 激活按钮 -->
                     <button 
                       nbButton 
                       ghost
@@ -51,48 +80,62 @@
                 </div>
               </nb-card-header>
               <nb-card-body>
-                <div class="mb-2">
-                  <small class="text-muted">FE 地址:</small>
-                  <div>{{ clusterCard.cluster.fe_host }}:{{ clusterCard.cluster.fe_http_port }}</div>
-                </div>
-
-                <div class="mb-2" *ngIf="clusterCard.cluster.description">
-                  <small class="text-muted">描述:</small>
-                  <div>{{ clusterCard.cluster.description }}</div>
-                </div>
-
-                <div class="mb-2" *ngIf="clusterCard.cluster.tags && clusterCard.cluster.tags.length > 0">
-                  <small class="text-muted">标签:</small>
-                  <div>
-                    <nb-badge
-                      *ngFor="let tag of clusterCard.cluster.tags"
-                      [text]="tag"
-                      status="basic"
-                      class="me-1"
-                    ></nb-badge>
-                  </div>
-                </div>
-
-                <div *ngIf="clusterCard.loading" class="text-center">
+                <div *ngIf="clusterCard.loading" class="text-center py-3">
                   <nb-spinner size="small" status="info"></nb-spinner>
                 </div>
 
-                <div *ngIf="!clusterCard.loading && clusterCard.health" class="mt-3">
-                  <small class="text-muted">健康检查:</small>
-                  <div *ngFor="let check of clusterCard.health.checks" class="mt-1">
-                    <small>{{ check.name }}: {{ check.message }}</small>
-                  </div>
-                </div>
+                <nb-list *ngIf="!clusterCard.loading">
+                  <!-- FE 地址 -->
+                  <nb-list-item>
+                    <div class="d-flex justify-content-between align-items-start w-100">
+                      <span class="text-hint">FE 地址</span>
+                      <span class="text-basic text-end">{{ clusterCard.cluster.fe_host }}:{{ clusterCard.cluster.fe_http_port }}</span>
+                    </div>
+                  </nb-list-item>
+
+                  <!-- 描述 -->
+                  <nb-list-item *ngIf="clusterCard.cluster.description">
+                    <div class="d-flex justify-content-between align-items-start w-100">
+                      <span class="text-hint">描述</span>
+                      <span class="text-basic text-end" style="max-width: 60%;">{{ clusterCard.cluster.description }}</span>
+                    </div>
+                  </nb-list-item>
+
+                  <!-- 标签 -->
+                  <nb-list-item *ngIf="clusterCard.cluster.tags && clusterCard.cluster.tags.length > 0">
+                    <div class="d-flex justify-content-between align-items-start w-100">
+                      <span class="text-hint">标签</span>
+                      <div class="text-end">
+                        <nb-badge
+                          *ngFor="let tag of clusterCard.cluster.tags"
+                          [text]="tag"
+                          status="basic"
+                          class="ms-1"
+                        ></nb-badge>
+                      </div>
+                    </div>
+                  </nb-list-item>
+
+                  <!-- 健康检查 -->
+                  <nb-list-item *ngIf="clusterCard.health">
+                    <div class="w-100">
+                      <div class="text-hint mb-1">健康检查</div>
+                      <div *ngFor="let check of clusterCard.health.checks" class="mt-1">
+                        <small class="text-success">{{ check.name }}: {{ check.message }}</small>
+                      </div>
+                    </div>
+                  </nb-list-item>
+                </nb-list>
               </nb-card-body>
               <nb-card-footer>
                 <div class="d-flex justify-content-between">
-                  <button nbButton size="small" status="info" (click)="navigateToCluster(clusterCard.cluster.id)">
+                  <button nbButton outline size="small" status="info" (click)="navigateToCluster(clusterCard.cluster.id)">
                     详情
                   </button>
-                  <button nbButton size="small" status="success" (click)="navigateToBackends(clusterCard.cluster.id)">
+                  <button nbButton outline size="small" status="success" (click)="navigateToBackends(clusterCard.cluster.id)">
                     节点
                   </button>
-                  <button nbButton size="small" status="warning" (click)="navigateToQueries(clusterCard.cluster.id)">
+                  <button nbButton outline size="small" status="warning" (click)="navigateToQueries(clusterCard.cluster.id)">
                     查询
                   </button>
                 </div>

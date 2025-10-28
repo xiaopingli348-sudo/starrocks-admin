@@ -1,4 +1,4 @@
-// Dashboard styles - using ngx-admin native components only
+// Dashboard styles - using ngx-admin native components with minimal enhancements
 :host {
   display: block;
 }
@@ -8,3 +8,109 @@
   gap: 0.5rem;
 }
 
+// 轻量级卡片增强 - 保持ngx-admin原生风格
+::ng-deep .cluster-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+  }
+  
+  // 优化nb-list样式 - 使用ngx-admin原生组件
+  nb-list {
+    nb-list-item {
+      padding: 0.75rem 0;
+      
+      // 标签文字样式（使用ngx-admin的text-hint）
+      .text-hint {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        white-space: nowrap;
+        min-width: 70px;
+      }
+      
+      // 值文字样式（使用ngx-admin的text-basic）
+      .text-basic {
+        font-size: 0.875rem;
+        word-break: break-all;
+      }
+      
+      // 健康检查成功文字（使用ngx-admin的text-success）
+      .text-success {
+        font-size: 0.8125rem;
+      }
+    }
+  }
+  
+  // 使用更柔和的颜色 - success状态
+  &.status-success {
+    border-color: rgba(0, 214, 143, 0.3) !important; // ngx-admin success色的30%透明度
+    
+    nb-card-header {
+      background: rgba(0, 214, 143, 0.15);
+      border-bottom-color: rgba(0, 214, 143, 0.25);
+    }
+  }
+  
+  // warning状态
+  &.status-warning {
+    border-color: rgba(255, 170, 0, 0.3) !important; // ngx-admin warning色的30%透明度
+    
+    nb-card-header {
+      background: rgba(255, 170, 0, 0.15);
+      border-bottom-color: rgba(255, 170, 0, 0.25);
+    }
+  }
+  
+  // danger状态
+  &.status-danger {
+    border-color: rgba(255, 61, 113, 0.3) !important; // ngx-admin danger色的30%透明度
+    
+    nb-card-header {
+      background: rgba(255, 61, 113, 0.15);
+      border-bottom-color: rgba(255, 61, 113, 0.25);
+    }
+  }
+}
+
+// 弱化按钮边框 - 使用ngx-admin原生outline样式但大幅降低边框透明度
+::ng-deep {
+  nb-card-footer {
+    button[nbButton][outline] {
+      // 直接降低边框透明度而不是整体透明度
+      border-color: rgba(0, 0, 0, 0.15) !important;
+      
+      &:hover {
+        border-color: currentColor !important;
+        opacity: 0.9;
+      }
+      
+      // 针对不同状态保持文字颜色
+      &.status-info {
+        color: #0095ff;
+      }
+      
+      &.status-success {
+        color: #00d68f;
+      }
+      
+      &.status-warning {
+        color: #ffaa00;
+      }
+    }
+  }
+}
+
+// 激活星标按钮微调
+.active-star {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}

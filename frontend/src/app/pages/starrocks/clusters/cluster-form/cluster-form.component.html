@@ -172,40 +172,46 @@
             <nb-checkbox formControlName="enable_ssl">启用 SSL</nb-checkbox>
           </div>
 
-          <div class="form-actions mt-4">
+          <div class="d-flex justify-content-between align-items-center mt-4 pt-3" style="border-top: 1px solid #edf1f7;">
             <button
               nbButton
+              outline
+              size="medium"
               status="info"
               type="button"
               (click)="testConnection()"
               [disabled]="loading"
-              class="me-2"
             >
               <nb-icon icon="refresh-outline"></nb-icon>
               测试连接
             </button>
 
-            <button
-              nbButton
-              status="primary"
-              type="submit"
-              [disabled]="loading"
-            >
-              <nb-icon icon="save-outline" *ngIf="!loading"></nb-icon>
-              <nb-icon icon="loader-outline" class="spin" *ngIf="loading"></nb-icon>
-              {{ isEditMode ? '更新' : '创建' }}
-            </button>
+            <div class="d-flex gap-3">
+              <button
+                nbButton
+                outline
+                size="medium"
+                status="basic"
+                type="button"
+                (click)="onCancel()"
+                [disabled]="loading"
+              >
+                取消
+              </button>
 
-            <button
-              nbButton
-              status="basic"
-              type="button"
-              (click)="onCancel()"
-              [disabled]="loading"
-              class="ms-2"
-            >
-              取消
-            </button>
+              <button
+                nbButton
+                outline
+                size="medium"
+                status="primary"
+                type="submit"
+                [disabled]="loading"
+              >
+                <nb-icon icon="save-outline" *ngIf="!loading"></nb-icon>
+                <nb-icon icon="loader-outline" class="spin" *ngIf="loading"></nb-icon>
+                {{ isEditMode ? '更新' : '创建' }}
+              </button>
+            </div>
           </div>
         </form>
       </nb-card-body>

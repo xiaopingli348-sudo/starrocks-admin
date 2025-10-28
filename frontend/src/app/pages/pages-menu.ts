@@ -13,11 +13,6 @@ export const MENU_ITEMS: NbMenuItem[] = [
     link: '/pages/starrocks/overview',
   },
   {
-    title: '集群管理',
-    icon: 'layers-outline',
-    link: '/pages/starrocks/clusters',
-  },
-  {
     title: '节点管理',
     icon: 'hard-drive-outline',
     children: [
