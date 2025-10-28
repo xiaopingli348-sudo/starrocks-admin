@@ -114,9 +114,6 @@ url = "sqlite://data/starrocks-admin.db"
 jwt_secret = "your-secret-key-change-in-production"
 jwt_expires_in = "24h"
 
-[cors]
-allow_origin = "http://localhost:4200"
-
 [logging]
 level = "info,starrocks_admin_backend=debug"
 file = "logs/starrocks-admin.log"

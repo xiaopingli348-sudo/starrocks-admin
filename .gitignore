@@ -70,3 +70,6 @@ Thumbs.db
 # Local config
 config.toml
 !config.toml.example
+frontend/frontend.log
+target
+.gitignore

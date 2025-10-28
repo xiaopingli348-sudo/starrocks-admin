@@ -293,3 +293,66 @@ pub async fn get_cluster_health(
 
     Ok(Json(health))
 }
+
+/// Test cluster connection with provided credentials (no ID required)
+#[utoipa::path(
+    post,
+    path = "/api/clusters/health/test",
+    request_body = HealthCheckRequest,
+    responses(
+        (status = 200, description = "Connection test result", body = ClusterHealth),
+        (status = 400, description = "Invalid request"),
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Clusters"
+)]
+pub async fn test_cluster_connection(
+    State(state): State<Arc<crate::AppState>>,
+    Json(health_req): Json<HealthCheckRequest>,
+) -> ApiResult<Json<ClusterHealth>> {
+    use crate::models::Cluster;
+
+    tracing::info!(
+        "Testing connection with provided credentials: host={}",
+        health_req
+            .fe_host
+            .as_ref()
+            .unwrap_or(&"unknown".to_string())
+    );
+
+    // Validate required fields
+    if health_req.fe_host.is_none() {
+        return Err(crate::utils::ApiError::validation_error("Missing required field: fe_host"));
+    }
+
+    let temp_cluster = Cluster {
+        id: 0,
+        name: "test".to_string(),
+        description: None,
+        fe_host: health_req.fe_host.unwrap(),
+        fe_http_port: health_req.fe_http_port.unwrap_or(8030),
+        fe_query_port: health_req.fe_query_port.unwrap_or(9030),
+        username: health_req.username.unwrap_or_else(|| "root".to_string()),
+        password_encrypted: health_req.password.unwrap_or_default(),
+        enable_ssl: health_req.enable_ssl,
+        connection_timeout: 10,
+        catalog: health_req
+            .catalog
+            .unwrap_or_else(|| "default_catalog".to_string()),
+        is_active: false,
+        tags: None,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+        created_by: None,
+    };
+
+    let health = state
+        .cluster_service
+        .get_cluster_health_for_cluster(&temp_cluster, &state.mysql_pool_manager)
+        .await?;
+
+    tracing::debug!("Connection test result: status={:?}", health.status);
+    Ok(Json(health))
+}

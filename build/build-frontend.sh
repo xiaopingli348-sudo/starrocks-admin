@@ -26,12 +26,12 @@ echo ""
 # Create web directory
 mkdir -p "$DIST_DIR/web"
 
-# Build frontend
-echo -e "${YELLOW}[1/2]${NC} Installing frontend dependencies..."
+# Clean up old frontend build
+echo -e "${YELLOW}[1/3]${NC} Installing frontend dependencies..."
 cd "$FRONTEND_DIR"
 npm install
 
-echo -e "${YELLOW}[2/2]${NC} Building Angular frontend (production mode)..."
+echo -e "${YELLOW}[2/3]${NC} Building Angular frontend (production mode)..."
 npm run build -- --configuration production
 
 # Copy built files

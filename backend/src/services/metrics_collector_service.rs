@@ -481,7 +481,8 @@ impl MetricsCollectorService {
                 load_running, load_finished_total,
                 jvm_heap_total, jvm_heap_used, jvm_heap_usage_pct, jvm_thread_count,
                 network_bytes_sent_total, network_bytes_received_total, network_send_rate, network_receive_rate,
-                io_read_bytes_total, io_write_bytes_total, io_read_rate, io_write_rate
+                io_read_bytes_total, io_write_bytes_total, io_read_rate, io_write_rate,
+                raw_metrics
             ) VALUES (
                 ?, ?,
                 ?, ?, ?, ?, ?,
@@ -495,8 +496,7 @@ impl MetricsCollectorService {
                 ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?, ?, ?
+                ?
             )
             "#
         )
@@ -541,6 +541,7 @@ impl MetricsCollectorService {
         .bind(snapshot.io_write_bytes_total)
         .bind(snapshot.io_read_rate)
         .bind(snapshot.io_write_rate)
+        .bind(None::<String>) // raw_metrics: reserved for future use
         .execute(&self.db)
         .await?;
 
@@ -612,6 +613,8 @@ impl MetricsCollectorService {
             io_write_bytes_total: i64,
             io_read_rate: f64,
             io_write_rate: f64,
+            #[allow(dead_code)]
+            raw_metrics: Option<String>,
         }
 
         let row: Option<SnapshotRow> = sqlx::query_as(

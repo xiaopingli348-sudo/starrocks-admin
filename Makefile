@@ -40,8 +40,8 @@ fmt-check:
 # Run clippy checks (following rustfs standard)
 clippy:
 	@echo "[clippy] Running clippy checks..."
-	@cd $(BACKEND_DIR) && DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --fix --allow-dirty --all-targets
-	@cd $(BACKEND_DIR) && DATABASE_URL="sqlite:../build/data/starrocks-admin.db" cargo clippy --all-targets --all-features -- -D warnings
+	@cd $(BACKEND_DIR) && DATABASE_URL="sqlite:$(BUILD_DIR)/data/starrocks-admin.db" cargo clippy --fix --allow-dirty --all-targets
+	@cd $(BACKEND_DIR) && DATABASE_URL="sqlite:$(BUILD_DIR)/data/starrocks-admin.db" cargo clippy --all-targets --all-features -- -D warnings
 
 # Run cargo check
 check:

@@ -3,7 +3,6 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
@@ -94,6 +93,7 @@ pub struct AppState {
         handlers::overview::get_data_statistics,
         handlers::overview::get_capacity_prediction,
         handlers::overview::get_extended_cluster_overview,
+        handlers::cluster::test_cluster_connection,
     ),
     components(
         schemas(
@@ -269,12 +269,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let executor = ScheduledExecutor::new("metrics-collector", std::time::Duration::from_secs(30));
     executor.spawn(Arc::clone(&metrics_collector_service));
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any)
-        .allow_credentials(false);
-
     // Wrap AppState in Arc for shared ownership across routes
     let app_state_arc = Arc::new(app_state);
 
@@ -300,6 +294,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/clusters/:id", put(handlers::cluster::update_cluster))
         .route("/api/clusters/:id", delete(handlers::cluster::delete_cluster))
         .route("/api/clusters/:id/activate", put(handlers::cluster::activate_cluster))
+        .route("/api/clusters/health/test", post(handlers::cluster::test_cluster_connection))
         .route(
             "/api/clusters/:id/health",
             get(handlers::cluster::get_cluster_health).post(handlers::cluster::get_cluster_health),
@@ -430,8 +425,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(protected_routes)
         .merge(health_routes)
         .merge(static_routes)
-        .layer(cors)
-        .layer(tower_http::trace::TraceLayer::new_for_http());
+        .layer(tower_http::trace::TraceLayer::new_for_http())
+        .layer(tower_http::cors::CorsLayer::permissive());
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;

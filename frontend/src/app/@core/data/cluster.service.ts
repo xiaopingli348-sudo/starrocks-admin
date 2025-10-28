@@ -79,10 +79,8 @@ export class ClusterService {
     return this.api.put<Cluster>(`/clusters/${id}/activate`, {});
   }
 
-  // Get cluster health (supports both modes)
-  // - For existing cluster: call with just id (GET request)
-  // - For new cluster: pass connection details in data parameter (POST request)
-  getHealth(id: number, data?: {
+  // Test connection for new cluster (connection validation)
+  testConnection(data: {
     fe_host: string;
     fe_http_port: number;
     fe_query_port: number;
@@ -91,9 +89,11 @@ export class ClusterService {
     enable_ssl?: boolean;
     catalog?: string;
   }): Observable<ClusterHealth> {
-    if (data) {
-      return this.api.post<ClusterHealth>(`/clusters/${id}/health`, data);
-    }
+    return this.api.post<ClusterHealth>('/clusters/health/test', data);
+  }
+
+  // Get health for existing cluster
+  getHealth(id: number): Observable<ClusterHealth> {
     return this.api.get<ClusterHealth>(`/clusters/${id}/health`);
   }
 }

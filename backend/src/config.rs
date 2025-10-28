@@ -8,7 +8,6 @@ pub struct Config {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub auth: AuthConfig,
-    pub cors: CorsConfig,
     pub logging: LoggingConfig,
     pub static_config: StaticConfig,
 }
@@ -31,12 +30,6 @@ pub struct DatabaseConfig {
 pub struct AuthConfig {
     pub jwt_secret: String,
     pub jwt_expires_in: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(default)]
-pub struct CorsConfig {
-    pub allow_origin: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -182,12 +175,6 @@ impl Default for AuthConfig {
             jwt_secret: "dev-secret-key-change-in-production".to_string(),
             jwt_expires_in: "24h".to_string(),
         }
-    }
-}
-
-impl Default for CorsConfig {
-    fn default() -> Self {
-        Self { allow_origin: "http://localhost:4200".to_string() }
     }
 }
 

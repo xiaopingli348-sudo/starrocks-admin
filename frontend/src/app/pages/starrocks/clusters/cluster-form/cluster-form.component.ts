@@ -170,41 +170,51 @@ export class ClusterFormComponent implements OnInit {
     this.loading = true;
     const formValue = this.clusterForm.value;
     
-    // For new cluster, pass connection details in body
-    const testData = !this.isEditMode ? {
-      fe_host: formValue.fe_host,
-      fe_http_port: formValue.fe_http_port,
-      fe_query_port: formValue.fe_query_port,
-      username: formValue.username,
-      password: formValue.password,
-      enable_ssl: formValue.enable_ssl || false,
-      catalog: formValue.catalog || 'default_catalog',
-    } : undefined;
+    if (!this.isEditMode) {
+      // New cluster mode: test connection with connection details
+      const testData = {
+        fe_host: formValue.fe_host,
+        fe_http_port: formValue.fe_http_port,
+        fe_query_port: formValue.fe_query_port,
+        username: formValue.username,
+        password: formValue.password,
+        enable_ssl: formValue.enable_ssl || false,
+        catalog: formValue.catalog || 'default_catalog',
+      };
 
-    const testId = this.clusterId || 0; // Use 0 for new cluster
+      this.clusterService.testConnection(testData).subscribe({
+        next: (health) => this.handleHealthCheckResult(health),
+        error: (error) => this.handleHealthCheckError(error),
+      });
+    } else {
+      // Edit mode: check health of existing cluster
+      this.clusterService.getHealth(this.clusterId).subscribe({
+        next: (health) => this.handleHealthCheckResult(health),
+        error: (error) => this.handleHealthCheckError(error),
+      });
+    }
+  }
 
-    this.clusterService.getHealth(testId, testData).subscribe({
-      next: (health) => {
-        if (health.status === 'healthy') {
-          const details = health.checks.map(c => c.name + ': ' + c.message).join('\n');
-          this.toastrService.success('健康检查通过\n' + details, '连接成功');
-        } else if (health.status === 'warning') {
-          const details = health.checks.map(c => c.name + ': ' + c.message).join('\n');
-          this.toastrService.warning('健康检查发现问题\n' + details, '警告');
-        } else {
-          const details = health.checks.map(c => c.name + ': ' + c.message).join('\n');
-          this.toastrService.danger('健康检查失败\n' + details, '连接失败');
-        }
-        this.loading = false;
-      },
-      error: (error) => {
-        this.toastrService.danger(
-          ErrorHandler.extractErrorMessage(error),
-          '错误',
-        );
-        this.loading = false;
-      },
-    });
+  private handleHealthCheckResult(health: any): void {
+    if (health.status === 'healthy') {
+      const details = health.checks.map((c: any) => c.name + ': ' + c.message).join('\n');
+      this.toastrService.success('健康检查通过\n' + details, '连接成功');
+    } else if (health.status === 'warning') {
+      const details = health.checks.map((c: any) => c.name + ': ' + c.message).join('\n');
+      this.toastrService.warning('健康检查发现问题\n' + details, '警告');
+    } else {
+      const details = health.checks.map((c: any) => c.name + ': ' + c.message).join('\n');
+      this.toastrService.danger('健康检查失败\n' + details, '连接失败');
+    }
+    this.loading = false;
+  }
+
+  private handleHealthCheckError(error: any): void {
+    this.toastrService.danger(
+      ErrorHandler.extractErrorMessage(error),
+      '错误',
+    );
+    this.loading = false;
   }
 }
 

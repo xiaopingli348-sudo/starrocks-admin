@@ -23,6 +23,10 @@ echo -e "${GREEN}Building StarRocks Admin Backend${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 
+# Clean up old dist directory
+echo -e "${YELLOW}[0/4]${NC} Cleaning old build artifacts..."
+rm -rf "$DIST_DIR"
+
 # Create dist directories
 mkdir -p "$DIST_DIR/bin"
 mkdir -p "$DIST_DIR/conf"
@@ -53,9 +57,6 @@ url = "sqlite://data/starrocks-admin.db"
 [auth]
 jwt_secret = "dev-secret-key-change-in-production"
 jwt_expires_in = "24h"
-
-[cors]
-allow_origin = "http://localhost:4200"
 
 [logging]
 level = "info,starrocks_admin_backend=debug"
@@ -139,6 +140,60 @@ get_pid() {
     fi
 }
 
+# 检查并强杀占用端口的进程
+kill_port_process() {
+    local port=$1
+    echo -e "${YELLOW}[INFO]${NC} 检查端口 $port 占用情况..."
+    
+    # 查找占用端口的进程
+    local pids=$(lsof -ti:$port 2>/dev/null || netstat -tlnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1)
+    
+    if [ -z "$pids" ]; then
+        echo -e "${GREEN}[INFO]${NC} 端口 $port 未被占用"
+        return 0
+    fi
+    
+    # 处理每个占用端口的进程
+    for pid in $pids; do
+        if [ -n "$pid" ] && [ "$pid" != "-" ]; then
+            # 获取进程信息
+            local proc_info=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
+            echo -e "${YELLOW}[WARNING]${NC} 端口 $port 被进程占用: PID=$pid, 进程=$proc_info"
+            
+            # 尝试优雅停止
+            echo -e "${YELLOW}[INFO]${NC} 尝试优雅停止进程 $pid..."
+            kill -TERM $pid 2>/dev/null || true
+            sleep 2
+            
+            # 检查进程是否还在运行
+            if ps -p $pid > /dev/null 2>&1; then
+                echo -e "${RED}[WARNING]${NC} 进程 $pid 未响应，强制终止..."
+                kill -KILL $pid 2>/dev/null || true
+                sleep 1
+            fi
+            
+            # 最终检查
+            if ps -p $pid > /dev/null 2>&1; then
+                echo -e "${RED}[ERROR]${NC} 无法终止进程 $pid，请手动处理"
+                return 1
+            else
+                echo -e "${GREEN}[SUCCESS]${NC} 已终止占用端口的进程 $pid"
+            fi
+        fi
+    done
+    
+    # 再次确认端口已释放
+    sleep 1
+    local check_pids=$(lsof -ti:$port 2>/dev/null)
+    if [ -n "$check_pids" ]; then
+        echo -e "${RED}[ERROR]${NC} 端口 $port 仍被占用，请手动检查"
+        return 1
+    fi
+    
+    echo -e "${GREEN}[SUCCESS]${NC} 端口 $port 已释放"
+    return 0
+}
+
 # 启动服务
 start_service() {
     if is_running; then
@@ -165,7 +220,7 @@ start_service() {
 
     # 设置环境变量
     export DATABASE_URL="${DATABASE_URL:-sqlite://$DATA_DIR/starrocks-admin.db}"
-export HOST="${HOST:-0.0.0.0}"
+    export HOST="${HOST:-0.0.0.0}"
     export PORT="${PORT:-8080}"
 
     # 显示配置信息
@@ -176,6 +231,13 @@ export HOST="${HOST:-0.0.0.0}"
     echo "  - 日志目录: $LOG_DIR"
     echo "  - 监听地址: $HOST:$PORT"
     echo "  - 数据库: $DATABASE_URL"
+    echo ""
+
+    # 检查并清理端口占用
+    if ! kill_port_process "$PORT"; then
+        echo -e "${RED}[ERROR]${NC} 无法释放端口 $PORT"
+        exit 1
+    fi
     echo ""
 
     # 启动后端
