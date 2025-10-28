@@ -157,7 +157,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   navigateToQueries(): void {
-    this.router.navigate(['/pages/starrocks/queries']);
+    this.router.navigate(['/pages/starrocks/queries/execution']);
   }
 
   addCluster(): void {

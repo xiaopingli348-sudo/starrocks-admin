@@ -31,7 +31,6 @@ import { ClusterDetailComponent } from './clusters/cluster-detail/cluster-detail
 import { BackendsComponent } from './backends/backends.component';
 import { FrontendsComponent } from './frontends/frontends.component';
 import { MaterializedViewsComponent } from './materialized-views/materialized-views.component';
-import { QueriesComponent } from './queries/queries.component';
 import { QueryExecutionComponent } from './queries/query-execution/query-execution.component';
 import { ProfileQueriesComponent } from './queries/profile-queries/profile-queries.component';
 import { AuditLogsComponent } from './queries/audit-logs/audit-logs.component';
@@ -56,7 +55,6 @@ import { ActiveToggleRenderComponent } from './materialized-views/active-toggle-
     FrontendsComponent,
     MaterializedViewsComponent,
     ActiveToggleRenderComponent,
-    QueriesComponent,
     QueryExecutionComponent,
     ProfileQueriesComponent,
     AuditLogsComponent,

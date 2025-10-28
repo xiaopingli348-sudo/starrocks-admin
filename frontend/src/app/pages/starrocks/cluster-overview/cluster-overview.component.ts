@@ -229,7 +229,7 @@ export class ClusterOverviewComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   navigateToQueries() {
-    this.router.navigate(['/pages/starrocks/queries']);
+    this.router.navigate(['/pages/starrocks/queries/execution']);
   }
 
   navigateToBackends() {

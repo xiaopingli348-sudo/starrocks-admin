@@ -50,7 +50,11 @@ export class ClusterDetailComponent implements OnInit {
   }
 
   navigateTo(path: string): void {
-    this.router.navigate(['/pages/starrocks', path, this.clusterId]);
+    if (path === 'queries') {
+      this.router.navigate(['/pages/starrocks/queries/execution']);
+    } else {
+      this.router.navigate(['/pages/starrocks', path, this.clusterId]);
+    }
   }
 
   editCluster(): void {

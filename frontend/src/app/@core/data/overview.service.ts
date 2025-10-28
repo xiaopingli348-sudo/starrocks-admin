@@ -366,7 +366,7 @@ export class OverviewService {
         trend: 0,
         status: 'info',
         icon: 'activity-outline',
-        navigateTo: '/pages/starrocks/queries',
+        navigateTo: '/pages/starrocks/queries/execution',
         description: '当前正在执行的查询数，OLAP典型值1-50'
       },
       // 6. Session连接数
