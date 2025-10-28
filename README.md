@@ -10,26 +10,26 @@
 
 **A modern, beautiful, and intelligent StarRocks cluster management platform**
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Deployment](#-deployment) • [API Documentation](#-api-documentation) • [Contributing](#-contributing)
+[Features](#features) • [Quick Start](#quick-start) • [Deployment](#deployment) • [API Documentation](#api-documentation) • [Contributing](#contributing)
 
 [中文版](#中文版) | [English](#english)
 
 </div>
 
-## 📖 Introduction
+## Introduction
 
 StarRocks Admin is a professional, enterprise-grade StarRocks database cluster management tool that provides an intuitive web interface for managing and monitoring multiple StarRocks clusters. Compared to StarRocks' native management interface, this platform offers richer functionality and a better user experience.
 
-### ✨ Core Features
+### Core Features
 
-- 🚀 **One-Click Deployment** - Supports traditional deployment, Docker, and Kubernetes
-- 📊 **Real-time Monitoring** - View real-time cluster status and performance metrics
-- 🔧 **Cluster Management** - Unified management of multiple StarRocks clusters
-- 🎨 **Modern UI** - Modern interface based on Angular + Nebular
-- 🔐 **Security Authentication** - JWT authentication and permission management
-- 📈 **Performance Analysis** - Query performance analysis and optimization suggestions
+- **One-Click Deployment** - Supports traditional deployment, Docker, and Kubernetes
+- **Real-time Monitoring** - View real-time cluster status and performance metrics
+- **Cluster Management** - Unified management of multiple StarRocks clusters
+- **Modern UI** - Modern interface based on Angular + Nebular
+- **Security Authentication** - JWT authentication and permission management
+- **Performance Analysis** - Query performance analysis and optimization suggestions
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Method 1: One-Click Deployment (Recommended)
 
@@ -64,7 +64,7 @@ make docker-up     # Start Docker container
 open http://localhost:8080
 ```
 
-## 🎨 Interface Preview
+## Interface Preview
 
 StarRocks Admin provides an intuitive and beautiful web management interface covering all aspects of cluster management.
 
@@ -100,7 +100,7 @@ Configure and manage system variables with support for viewing and modifying run
 ![System Management](docs/images/4.功能卡片.png)
 System-level configuration management including user permissions, system functions, and more. Also supports custom SQL.
 
-## 🔧 Configuration
+## Configuration
 
 ### Main Configuration File (conf/config.toml)
 
@@ -125,7 +125,7 @@ enabled = true
 web_root = "web"
 ```
 
-## 🤝 Contributing
+## Contributing
 
 We welcome all forms of contributions! Please follow these steps:
 
@@ -135,18 +135,18 @@ We welcome all forms of contributions! Please follow these steps:
 4. **Push to the branch** (`git push origin feature/AmazingFeature`)
 5. **Create a Pull Request**
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [ngx-admin](https://github.com/John/ngx-admin) - Excellent Angular admin template
 - [Nebular](https://John.github.io/nebular/) - Beautiful UI component library
 - [Axum](https://github.com/tokio-rs/axum) - Powerful Rust web framework
 - [StarRocks](https://www.starrocks.io/) - High-performance analytical database
 
-## 💝 Donation Support
+## Donation Support
 
 <div align="center">
 
@@ -158,7 +158,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ for StarRocks Community**
 
-[⬆ Back to Top](#starrocks-admin)
+[↑ Back to Top](#starrocks-admin)
 
 </div>
 
@@ -170,26 +170,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **一个现代化、美观、智能的 StarRocks 集群管理平台**
 
-[功能特性](#-功能特性) • [快速开始](#-快速开始) • [部署指南](#-部署指南) • [API 文档](#-api-文档) • [贡献](#-贡献)
+[功能特性](#功能特性) • [快速开始](#快速开始) • [部署指南](#部署指南) • [API 文档](#api-文档) • [贡献](#贡献)
 
 [English](#english) | [中文版](#中文版)
 
 </div>
 
-## 📖 简介
+## 简介
 
 StarRocks Admin 是一个专业的、企业级的 StarRocks 数据库集群管理工具，提供直观的 Web 界面来管理和监控多个 StarRocks 集群。相比 StarRocks 原生的管理界面，本平台提供了更丰富的功能和更好的用户体验。
 
-### ✨ 核心特性
+### 核心特性
 
-- 🚀 **一键部署** - 支持传统部署、Docker 和 Kubernetes
-- 📊 **实时监控** - 查看集群的实时状态和性能指标
-- 🔧 **集群管理** - 统一管理多个 StarRocks 集群
-- 🎨 **现代 UI** - 基于 Angular + Nebular 的现代化界面
-- 🔐 **安全认证** - JWT 认证和权限管理
-- 📈 **性能分析** - 查询性能分析和优化建议
+- **一键部署** - 支持传统部署、Docker 和 Kubernetes
+- **实时监控** - 查看集群的实时状态和性能指标
+- **集群管理** - 统一管理多个 StarRocks 集群
+- **现代 UI** - 基于 Angular + Nebular 的现代化界面
+- **安全认证** - JWT 认证和权限管理
+- **性能分析** - 查询性能分析和优化建议
 
-## 🚀 快速开始
+## 快速开始
 
 ### 方式一：一键部署（推荐）
 
@@ -224,7 +224,7 @@ make docker-up     # 启动 Docker 容器
 open http://localhost:8080
 ```
 
-## 🎨 界面预览
+## 界面预览
 
 StarRocks Admin 提供了直观、美观的 Web 管理界面，涵盖集群管理的各个方面。
 
@@ -260,7 +260,7 @@ StarRocks Admin 提供了直观、美观的 Web 管理界面，涵盖集群管�
 ![系统管理](docs/images/4.功能卡片.png)
 系统级别的配置管理，包括用户权限、系统函数等功能。还支持自定义SQL。
 
-## 🔧 配置说明
+## 配置说明
 
 ### 主配置文件 (conf/config.toml)
 
@@ -285,7 +285,7 @@ enabled = true
 web_root = "web"
 ```
 
-## 🤝 贡献
+## 贡献
 
 我们欢迎所有形式的贡献！请遵循以下步骤：
 
@@ -295,18 +295,18 @@ web_root = "web"
 4. **推送分支** (`git push origin feature/AmazingFeature`)
 5. **创建 Pull Request**
 
-## 📄 许可证
+## 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
-## 🙏 致谢
+## 致谢
 
 - [ngx-admin](https://github.com/John/ngx-admin) - 优秀的 Angular 管理模板
 - [Nebular](https://John.github.io/nebular/) - 漂亮的 UI 组件库
 - [Axum](https://github.com/tokio-rs/axum) - 强大的 Rust Web 框架
 - [StarRocks](https://www.starrocks.io/) - 高性能分析数据库
 
-## 💝 捐赠支持
+## 捐赠支持
 
 <div align="center">
 
@@ -318,6 +318,6 @@ web_root = "web"
 
 **Made with ❤️ for StarRocks Community**
 
-[⬆ 回到顶部](#starrocks-admin)
+[↑ 回到顶部](#starrocks-admin)
 
 </div>
