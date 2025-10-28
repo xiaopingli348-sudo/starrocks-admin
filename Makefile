@@ -1,4 +1,4 @@
-.PHONY: help build lint fmt check pre-commit docker-build docker-up docker-down clean
+.PHONY: help build package lint fmt check pre-commit docker-build docker-up docker-down clean
 
 # Project paths
 PROJECT_ROOT := $(shell pwd)
@@ -21,6 +21,7 @@ help:
 	@echo ""
 	@echo "Build:"
 	@echo "  make build        - Build backend and frontend (runs pre-commit first)"
+	@echo "  make package      - Build and create distribution package (tar.gz)"
 	@echo "  make docker-build - Build Docker image"
 	@echo "  make docker-up    - Start Docker container"
 	@echo "  make docker-down  - Stop Docker container"
@@ -61,6 +62,17 @@ build: pre-commit
 	@bash build/build-backend.sh
 	@bash build/build-frontend.sh
 	@echo "Build complete! Output: $(DIST_DIR)"
+
+# Create distribution package (tar.gz)
+package: build
+	@echo "Creating distribution package..."
+	@TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
+	PACKAGE_NAME="starrocks-admin-$$TIMESTAMP.tar.gz"; \
+	PACKAGE_PATH="$(DIST_DIR)/$$PACKAGE_NAME"; \
+	echo "Package name: $$PACKAGE_NAME"; \
+	cd $(DIST_DIR) && tar -czf "$$PACKAGE_NAME" --transform 's,^,starrocks-admin/,' *; \
+	echo "Package created: $$PACKAGE_PATH"; \
+	echo "To extract: tar -xzf $$PACKAGE_NAME"
 
 # Build Docker image
 docker-build:
