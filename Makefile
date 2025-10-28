@@ -1,4 +1,4 @@
-.PHONY: help build package lint fmt check pre-commit docker-build docker-up docker-down clean
+.PHONY: help build lint fmt check pre-commit docker-build docker-up docker-down clean
 
 # Project paths
 PROJECT_ROOT := $(shell pwd)
@@ -20,8 +20,7 @@ help:
 	@echo "  make lint         - Alias for clippy"
 	@echo ""
 	@echo "Build:"
-	@echo "  make build        - Build backend and frontend (runs pre-commit first)"
-	@echo "  make package      - Build and create distribution package (tar.gz)"
+	@echo "  make build        - Build backend and frontend, then create distribution package"
 	@echo "  make docker-build - Build Docker image"
 	@echo "  make docker-up    - Start Docker container"
 	@echo "  make docker-down  - Stop Docker container"
@@ -56,17 +55,14 @@ lint: clippy
 pre-commit: fmt clippy check
 	@echo "[pre-commit] All pre-commit checks passed!"
 
-# Build both backend and frontend (runs pre-commit first)
+# Build both backend and frontend, then create distribution package
 build: pre-commit
 	@echo "Building StarRocks Admin..."
 	@bash build/build-backend.sh
 	@bash build/build-frontend.sh
 	@echo "Build complete! Output: $(DIST_DIR)"
-
-# Create distribution package (tar.gz)
-package: build
 	@echo "Creating distribution package..."
-	@TIMESTAMP=$$(date +"%Y%m%d_%H%M%S"); \
+	@TIMESTAMP=$$(date +"%Y%m%d"); \
 	PACKAGE_NAME="starrocks-admin-$$TIMESTAMP.tar.gz"; \
 	PACKAGE_PATH="$(DIST_DIR)/$$PACKAGE_NAME"; \
 	echo "Package name: $$PACKAGE_NAME"; \
