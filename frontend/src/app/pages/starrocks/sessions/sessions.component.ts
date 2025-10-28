@@ -132,8 +132,6 @@ export class SessionsComponent implements OnInit, OnDestroy {
       if (this.autoRefresh) {
         this.startAutoRefresh();
       }
-    } else if (!this.clusterContext.hasActiveCluster()) {
-      this.toastrService.warning('请先在集群概览页面激活一个集群', '提示');
     }
   }
 

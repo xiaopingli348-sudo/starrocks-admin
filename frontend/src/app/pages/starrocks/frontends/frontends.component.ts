@@ -130,9 +130,6 @@ export class FrontendsComponent implements OnInit, OnDestroy {
     if (this.clusterId && this.clusterId > 0) {
       this.loadClusterInfo();
       this.loadFrontends();
-    } else if (!this.clusterContext.hasActiveCluster()) {
-      this.toastrService.warning('请先在集群概览页面激活一个集群', '提示');
-      this.loading = false;
     }
     
     interval(10000)

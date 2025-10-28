@@ -4,22 +4,20 @@ import { NbToastrService, NbDialogService } from '@nebular/theme';
 import { LocalDataSource } from 'ng2-smart-table';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { NodeService, QueryHistoryItem, QueryExecuteResult } from '../../../@core/data/node.service';
-import { ClusterContextService } from '../../../@core/data/cluster-context.service';
-import { Cluster } from '../../../@core/data/cluster.service';
-import { ErrorHandler } from '../../../@core/utils/error-handler';
+import { NodeService, QueryExecuteResult } from '../../../../@core/data/node.service';
+import { ClusterContextService } from '../../../../@core/data/cluster-context.service';
+import { Cluster } from '../../../../@core/data/cluster.service';
+import { ErrorHandler } from '../../../../@core/utils/error-handler';
 
 @Component({
-  selector: 'ngx-queries',
-  templateUrl: './queries.component.html',
-  styleUrls: ['./queries.component.scss'],
+  selector: 'ngx-query-execution',
+  templateUrl: './query-execution.component.html',
+  styleUrls: ['./query-execution.component.scss'],
 })
-export class QueriesComponent implements OnInit, OnDestroy {
+export class QueryExecutionComponent implements OnInit, OnDestroy {
   // Data sources
   runningSource: LocalDataSource = new LocalDataSource();
-  historySource: LocalDataSource = new LocalDataSource();
   realtimeResultSource: LocalDataSource = new LocalDataSource();
-  profileSource: LocalDataSource = new LocalDataSource();
   
   // Expose Math to template
   Math = Math;
@@ -28,7 +26,7 @@ export class QueriesComponent implements OnInit, OnDestroy {
   clusterId: number;
   activeCluster: Cluster | null = null;
   loading = true;
-  selectedTab = 'realtime'; // 'realtime', 'running', 'history', or 'profiles'
+  selectedTab = 'realtime'; // 'realtime' or 'running'
   autoRefresh = false; // Default: disabled
   refreshInterval: any;
   selectedRefreshInterval = 5; // Default 5 seconds
@@ -40,12 +38,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
     { value: 60, label: '1分钟' },
   ];
   private destroy$ = new Subject<void>();
-
-  // Profile dialog
-  currentProfile: any = null;
-  currentProfileDetail: string = '';
-  @ViewChild('profileDialog') profileDialogTemplate: TemplateRef<any>;
-  @ViewChild('profileDetailDialog') profileDetailDialogTemplate: TemplateRef<any>;
 
   // Real-time query state
   sqlInput: string = '';
@@ -62,16 +54,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
     { value: 5000, label: '5000 行' },
     { value: 10000, label: '10000 行' },
   ];
-
-  // History search filters
-  searchKeyword: string = '';
-  searchStartTime: string = '';
-  searchEndTime: string = '';
-
-  // Pagination state for history
-  historyPageSize: number = 10;
-  historyCurrentPage: number = 1;
-  historyTotalCount: number = 0;
   
   // Running queries settings
   runningSettings = {
@@ -89,70 +71,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
       Database: { title: '数据库', type: 'string', width: '10%' },
       ExecTime: { title: '执行时间', type: 'string', width: '10%' },
       Sql: { title: 'SQL', type: 'string' },
-    },
-  };
-
-  // History queries settings with Profile button
-  historySettings = {
-    mode: 'external',
-    hideSubHeader: false, // Enable search
-    noDataMessage: '暂无历史查询记录',
-    actions: {
-      add: false,
-      edit: true,
-      delete: false,
-      position: 'right',
-    },
-    edit: {
-      editButtonContent: '<i class="nb-search"></i>',
-    },
-    pager: {
-      display: false, // Disable ng2-smart-table's built-in pagination (we'll use custom pagination)
-    },
-    columns: {
-      query_id: { title: 'Query ID', type: 'string' },
-      user: { title: '用户', type: 'string', width: '8%' },
-      default_db: { title: '数据库', type: 'string', width: '8%' },
-      query_type: { title: '类型', type: 'string', width: '8%' },
-      query_state: { title: '状态', type: 'string', width: '8%' },
-      start_time: { title: '开始时间', type: 'string', width: '12%' },
-      total_ms: { title: '耗时(ms)', type: 'number', width: '8%' },
-      sql_statement: { title: 'SQL', type: 'string' },
-    },
-  };
-
-  // Profile management settings
-  profileSettings = {
-    mode: 'external',
-    hideSubHeader: false, // Enable search
-    noDataMessage: '暂无Profile记录',
-    actions: {
-      add: false,
-      edit: true,
-      delete: false,
-      position: 'right',
-    },
-    edit: {
-      editButtonContent: '<i class="nb-search"></i>',
-    },
-    pager: {
-      display: true,
-      perPage: 20,
-    },
-    columns: {
-      QueryId: { title: 'Query ID', type: 'string', width: '25%' },
-      StartTime: { title: '开始时间', type: 'string', width: '15%' },
-      Time: { title: '执行时间', type: 'string', width: '10%' },
-      State: {
-        title: '状态',
-        type: 'html',
-        width: '10%',
-        valuePrepareFunction: (value: string) => {
-          const status = value === 'Finished' ? 'success' : 'warning';
-          return `<span class="badge badge-${status}">${value}</span>`;
-        },
-      },
-      Statement: { title: 'SQL语句', type: 'string', width: '40%' },
     },
   };
 
@@ -179,8 +97,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
           const newClusterId = cluster.id;
           if (this.clusterId !== newClusterId) {
             this.clusterId = newClusterId;
-            // Reset pagination when cluster changes
-            this.historyCurrentPage = 1;
             // Only load if not on realtime tab
             if (this.selectedTab !== 'realtime') {
               this.loadCurrentTab();
@@ -251,10 +167,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
   loadCurrentTab(): void {
     if (this.selectedTab === 'running') {
       this.loadRunningQueries();
-    } else if (this.selectedTab === 'history') {
-      this.loadHistoryQueries();
-    } else if (this.selectedTab === 'profiles') {
-      this.loadProfiles();
     } else {
       // realtime tab doesn't need auto-loading
       this.loading = false;
@@ -272,78 +184,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
       error: (error) => {
         this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '加载失败');
         this.loading = false;
-      },
-    });
-  }
-
-  // Load history queries with server-side pagination
-  loadHistoryQueries(): void {
-    const offset = (this.historyCurrentPage - 1) * this.historyPageSize;
-    
-    this.loading = true;
-    
-    this.nodeService.listQueryHistory(this.historyPageSize, offset).subscribe({
-      next: (response) => {
-        
-        // Update total count for pagination
-        this.historyTotalCount = response.total;
-        
-        // Load data into table
-        this.historySource.load(response.data);
-        this.loading = false;
-      },
-      error: (error) => {
-        this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '加载失败');
-        this.historySource.load([]);
-        this.historyTotalCount = 0;
-        this.loading = false;
-      },
-      complete: () => {
-        // Ensure loading is always set to false
-        this.loading = false;
-      }
-    });
-  }
-
-  // Calculate total pages
-  get historyTotalPages(): number {
-    return Math.ceil(this.historyTotalCount / this.historyPageSize);
-  }
-
-  // Handle page change
-  onHistoryPageChange(page: number): void {
-    if (page < 1 || page > this.historyTotalPages) {
-      return;
-    }
-    this.historyCurrentPage = page;
-    this.loadHistoryQueries();
-  }
-
-  // Handle page size change
-  onHistoryPageSizeChange(size: number): void {
-    this.historyPageSize = size;
-    this.historyCurrentPage = 1; // Reset to first page
-    this.loadHistoryQueries();
-  }
-
-  // Handle edit action (View Profile)
-  onEditProfile(event: any): void {
-    const query: QueryHistoryItem = event.data;
-    this.viewProfile(query.query_id);
-  }
-
-  // View query profile
-  viewProfile(queryId: string): void {
-    this.nodeService.getQueryProfile(queryId).subscribe({
-      next: (profile) => {
-        this.currentProfile = profile;
-        // Open profile dialog
-        this.dialogService.open(this.profileDialogTemplate, {
-          context: { profile },
-        });
-      },
-      error: (error) => {
-        this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '加载失败');
       },
     });
   }
@@ -428,42 +268,6 @@ export class QueriesComponent implements OnInit, OnDestroy {
     this.sqlInput = formatted;
   }
 
-  // Search history methods
-  searchHistory(): void {
-    if (!this.clusterId) {
-      return;
-    }
-    
-    // Reload history with current filters
-    this.loadHistoryQueries();
-  }
-
-  applyHistoryFilters(queries: QueryHistoryItem[]): QueryHistoryItem[] {
-    let filtered = queries;
-
-    // Filter by keyword (search in query_id and sql_statement)
-    if (this.searchKeyword && this.searchKeyword.trim() !== '') {
-      const keyword = this.searchKeyword.toLowerCase();
-      filtered = filtered.filter(q => 
-        q.query_id.toLowerCase().includes(keyword) || 
-        q.sql_statement.toLowerCase().includes(keyword) ||
-        q.user.toLowerCase().includes(keyword)
-      );
-    }
-
-    // Filter by start time
-    if (this.searchStartTime) {
-      filtered = filtered.filter(q => q.start_time >= this.searchStartTime);
-    }
-
-    // Filter by end time
-    if (this.searchEndTime) {
-      filtered = filtered.filter(q => q.start_time <= this.searchEndTime);
-    }
-
-    return filtered;
-  }
-
   // Export results to CSV
   exportResults(): void {
     if (!this.queryResult || !this.queryResult.rows || this.queryResult.rows.length === 0) {
@@ -514,44 +318,5 @@ export class QueriesComponent implements OnInit, OnDestroy {
       return '"' + stringValue.replace(/"/g, '""') + '"';
     }
     return stringValue;
-  }
-
-  // Load profiles
-  loadProfiles(): void {
-    this.loading = true;
-    this.nodeService.listProfiles().subscribe(
-      data => {
-        this.profileSource.load(data);
-        this.loading = false;
-      },
-      error => {
-        this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '加载失败');
-        this.loading = false;
-      }
-    );
-  }
-
-  // Handle profile edit action (view profile)
-  onProfileEdit(event: any): void {
-    this.viewProfileDetail(event.data.QueryId);
-  }
-
-  // View profile detail from profile list
-  viewProfileDetail(queryId: string): void {
-    this.nodeService.getProfile(queryId).subscribe(
-      data => {
-        this.currentProfileDetail = data.profile_content;
-        this.dialogService.open(this.profileDetailDialogTemplate, {
-          context: { profile: this.currentProfileDetail },
-          hasBackdrop: true,
-          closeOnBackdropClick: true,
-          closeOnEsc: true,
-          dialogClass: 'modal-lg', // Use Bootstrap's large modal class
-        });
-      },
-      error => {
-        this.toastrService.danger(ErrorHandler.extractErrorMessage(error), '加载失败');
-      }
-    );
   }
 }

@@ -32,6 +32,9 @@ import { BackendsComponent } from './backends/backends.component';
 import { FrontendsComponent } from './frontends/frontends.component';
 import { MaterializedViewsComponent } from './materialized-views/materialized-views.component';
 import { QueriesComponent } from './queries/queries.component';
+import { QueryExecutionComponent } from './queries/query-execution/query-execution.component';
+import { ProfileQueriesComponent } from './queries/profile-queries/profile-queries.component';
+import { AuditLogsComponent } from './queries/audit-logs/audit-logs.component';
 import { SessionsComponent } from './sessions/sessions.component';
 import { VariablesComponent } from './variables/variables.component';
 import { SystemManagementComponent } from './system-management/system-management.component';
@@ -54,6 +57,9 @@ import { ActiveToggleRenderComponent } from './materialized-views/active-toggle-
     MaterializedViewsComponent,
     ActiveToggleRenderComponent,
     QueriesComponent,
+    QueryExecutionComponent,
+    ProfileQueriesComponent,
+    AuditLogsComponent,
     SessionsComponent,
     VariablesComponent,
     SystemManagementComponent,

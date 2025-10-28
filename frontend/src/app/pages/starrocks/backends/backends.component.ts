@@ -167,9 +167,6 @@ export class BackendsComponent implements OnInit, OnDestroy {
     if (this.clusterId && this.clusterId > 0) {
       this.loadClusterInfo();
       this.loadBackends();
-    } else {
-      this.toastrService.warning('请先在集群概览页面激活一个集群', '提示');
-      this.loading = false;
     }
     
     // Auto refresh every 10 seconds

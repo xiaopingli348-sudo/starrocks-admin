@@ -1,0 +1,82 @@
+<div class="row">
+  <div class="col-12">
+    <nb-card>
+      <nb-card-header>
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-2">
+            <h5 class="mb-0">Profiles</h5>
+            <span class="text-hint">|</span>
+            <span class="text-hint" style="font-size: 13px;">
+              集群: <strong>{{ activeCluster.name }}</strong>
+            </span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button nbButton status="primary" size="small" (click)="loadProfiles()" [disabled]="loading || !clusterId">
+              <nb-icon icon="refresh-outline"></nb-icon>
+              刷新
+            </button>
+            
+            <nb-select 
+              [(selected)]="selectedRefreshInterval" 
+              size="small" 
+              placeholder="间隔"
+              (selectedChange)="onRefreshIntervalChange($event)"
+              [disabled]="!clusterId"
+              style="min-width: 90px;"
+            >
+              <nb-option *ngFor="let option of refreshIntervalOptions" [value]="option.value">
+                {{ option.label }}
+              </nb-option>
+            </nb-select>
+            
+            <button 
+              nbButton 
+              [status]="autoRefresh ? 'success' : 'basic'" 
+              size="small" 
+              (click)="toggleAutoRefresh()"
+              [disabled]="!clusterId"
+            >
+              <nb-icon [icon]="autoRefresh ? 'checkmark-circle-2-outline' : 'pause-circle-outline'"></nb-icon>
+              {{ autoRefresh ? '停止' : '自动' }}
+            </button>
+          </div>
+        </div>
+      </nb-card-header>
+      <nb-card-body>
+        <div class="profile-container">
+          <div *ngIf="loading" class="text-center mt-3"><nb-spinner status="primary"></nb-spinner></div>
+          <ng2-smart-table 
+            *ngIf="!loading" 
+            [settings]="profileSettings" 
+            [source]="profileSource"
+            (edit)="onProfileEdit($event)">
+          </ng2-smart-table>
+        </div>
+      </nb-card-body>
+    </nb-card>
+  </div>
+</div>
+
+<!-- Profile Detail Dialog Template -->
+<ng-template #profileDetailDialog let-data let-ref="dialogRef">
+  <nb-card accent="info">
+    <nb-card-header>
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+          <nb-icon icon="file-text-outline" status="info" class="me-2"></nb-icon>
+          <h5 class="mb-0">Query Profile 详情</h5>
+        </div>
+        <button nbButton ghost status="basic" size="small" (click)="ref.close()">
+          <nb-icon icon="close-outline"></nb-icon>
+        </button>
+      </div>
+    </nb-card-header>
+    <nb-card-body>
+      <nb-card accent="basic">
+        <nb-card-body class="profile-scroll-container">
+          <pre class="profile-content-text">{{ currentProfileDetail }}</pre>
+        </nb-card-body>
+      </nb-card>
+    </nb-card-body>
+  </nb-card>
+</ng-template>

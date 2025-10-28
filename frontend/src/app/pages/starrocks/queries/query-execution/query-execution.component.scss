@@ -1,0 +1,73 @@
+// Copy styles from the original queries component
+.realtime-query-container {
+  .sql-editor-section {
+    margin-bottom: 1.5rem;
+    
+    .sql-editor {
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+    
+    .editor-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.5rem;
+      
+      .left-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      
+      .right-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        
+        .limit-label {
+          font-size: 12px;
+          color: var(--text-hint-color);
+        }
+      }
+    }
+    
+    .hint-text {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-top: 0.5rem;
+      color: var(--text-hint-color);
+      font-size: 12px;
+    }
+  }
+  
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .result-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+  
+  .no-data-message {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-hint-color);
+    
+    nb-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+    
+    p {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+  }
+}

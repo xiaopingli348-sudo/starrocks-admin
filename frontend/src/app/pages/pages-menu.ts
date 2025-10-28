@@ -29,7 +29,20 @@ export const MENU_ITEMS: NbMenuItem[] = [
   {
     title: '查询管理',
     icon: 'code-outline',
-    link: '/pages/starrocks/queries',
+    children: [
+      {
+        title: '实时查询',
+        link: '/pages/starrocks/queries/execution',
+      },
+      {
+        title: 'Profiles',
+        link: '/pages/starrocks/queries/profiles',
+      },
+      {
+        title: '审计日志',
+        link: '/pages/starrocks/queries/audit-logs',
+      },
+    ],
   },
   {
     title: '物化视图',

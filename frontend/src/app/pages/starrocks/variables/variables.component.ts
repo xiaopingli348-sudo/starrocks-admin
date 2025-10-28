@@ -90,8 +90,6 @@ export class VariablesComponent implements OnInit, OnDestroy {
     // Load variables if clusterId is already set
     if (this.clusterId && this.clusterId > 0) {
       this.loadVariables();
-    } else if (!this.clusterContext.hasActiveCluster()) {
-      this.toastrService.warning('请先在集群概览页面激活一个集群', '提示');
     }
   }
 
