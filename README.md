@@ -1,4 +1,4 @@
-# StarRocks Admin {#english}
+# StarRocks Admin
 
 <div align="center">
 
@@ -137,7 +137,7 @@ We welcome all forms of contributions! Please follow these steps:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
@@ -297,7 +297,7 @@ web_root = "web"
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+本项目采用 Apache License 2.0 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 致谢
 
