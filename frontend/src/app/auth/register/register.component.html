@@ -127,6 +127,46 @@
               </ng-container>
             </div>
 
+            <!-- Avatar Selection -->
+            <div class="form-control-group">
+              <label class="label">选择您的头像</label>
+              <p class="subtitle">这将是您在平台上的个人标识</p>
+              
+              <!-- Current Avatar Preview -->
+              <div class="avatar-preview-section">
+                <div class="current-avatar-large">
+                  <img *ngIf="user.avatar" [src]="user.avatar" [alt]="'Selected Avatar'" class="preview-image">
+                  <div *ngIf="!user.avatar" class="avatar-placeholder-large">
+                    <nb-icon icon="person-outline"></nb-icon>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Avatar Options Grid -->
+              <div class="avatar-options-grid">
+                <div 
+                  *ngFor="let avatar of availableAvatars; let i = index" 
+                  class="avatar-option-small"
+                  [class.selected]="user.avatar === avatar"
+                  (click)="selectAvatar(avatar)">
+                  <img [src]="avatar" [alt]="'Avatar Option'" class="option-image">
+                </div>
+              </div>
+
+              <!-- Refresh Button -->
+              <div class="refresh-section">
+                <button 
+                  type="button" 
+                  nbButton 
+                  status="primary" 
+                  size="medium"
+                  (click)="generateAvatarOptions()">
+                  <nb-icon icon="refresh-outline"></nb-icon>
+                  换一批
+                </button>
+              </div>
+            </div>
+
             <!-- Submit Button -->
             <button 
               nbButton 

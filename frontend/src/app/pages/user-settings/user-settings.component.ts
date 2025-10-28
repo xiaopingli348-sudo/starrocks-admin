@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { NbToastrService } from '@nebular/theme';
 import { AuthService, User } from '../../@core/data/auth.service';
 import { ApiService } from '../../@core/data/api.service';
+import { DiceBearService } from '../../@core/services/dicebear.service';
 
 @Component({
   selector: 'ngx-user-settings',
@@ -25,22 +26,19 @@ export class UserSettingsComponent implements OnInit {
 
   errors: string[] = [];
   showPasswordFields = false;
+  showAvatarSelection = false;
+  selectedAvatarStyle = 'lorelei';
 
-  // 可用的头像列表
-  availableAvatars = [
-    'assets/images/nick.png',
-    'assets/images/eva.png',
-    'assets/images/jack.png',
-    'assets/images/kate.png',
-    'assets/images/lee.png',
-    'assets/images/alan.png',
-  ];
+  // DiceBear头像选项
+  availableAvatars: string[] = [];
+  avatarStyles = this.diceBearService.avatarStyles;
 
   constructor(
     private authService: AuthService,
     private apiService: ApiService,
     private toastrService: NbToastrService,
-    private router: Router
+    private router: Router,
+    private diceBearService: DiceBearService
   ) {}
 
   ngOnInit() {
@@ -66,6 +64,21 @@ export class UserSettingsComponent implements OnInit {
 
   selectAvatar(avatar: string) {
     this.userForm.avatar = avatar;
+  }
+
+  generateAvatarOptions() {
+    this.availableAvatars = this.diceBearService.generateAvatarOptions(6, this.selectedAvatarStyle);
+  }
+
+  onAvatarStyleChange() {
+    this.generateAvatarOptions();
+  }
+
+  toggleAvatarSelection() {
+    this.showAvatarSelection = !this.showAvatarSelection;
+    if (this.showAvatarSelection && this.availableAvatars.length === 0) {
+      this.generateAvatarOptions();
+    }
   }
 
   togglePasswordFields() {
@@ -172,6 +185,11 @@ export class UserSettingsComponent implements OnInit {
               this.userForm.currentPassword = '';
               this.userForm.newPassword = '';
               this.userForm.confirmPassword = '';
+              
+              // Redirect to cluster list page after successful update
+              setTimeout(() => {
+                this.router.navigate(['/pages/starrocks/clusters']);
+              }, 1500);
             },
             error: (error) => {
               console.error('Failed to reload user info:', error);
@@ -180,6 +198,11 @@ export class UserSettingsComponent implements OnInit {
               this.userForm.currentPassword = '';
               this.userForm.newPassword = '';
               this.userForm.confirmPassword = '';
+              
+              // Still redirect to cluster list page even if reload fails
+              setTimeout(() => {
+                this.router.navigate(['/pages/starrocks/clusters']);
+              }, 1500);
             }
           });
         }

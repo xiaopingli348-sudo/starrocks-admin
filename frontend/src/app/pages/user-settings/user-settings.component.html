@@ -27,32 +27,50 @@
 
         <!-- User Settings Form -->
         <form *ngIf="!loading" (ngSubmit)="onSubmit()" #form="ngForm">
-          <!-- Avatar Selection -->
+          <!-- Avatar Selection - First Section -->
           <div class="row">
-            <div class="col-md-12">
+            <div class="col-md-4">
               <div class="form-group">
-                <label class="label">选择头像</label>
-                <div class="avatar-selection">
+                <label class="label">头像设置</label>
+                
+                <!-- Current Avatar Preview -->
+                <div class="avatar-preview-section">
+                  <div class="current-avatar-large">
+                    <img *ngIf="userForm.avatar" [src]="userForm.avatar" [alt]="'Current Avatar'" class="preview-image">
+                    <div *ngIf="!userForm.avatar" class="avatar-placeholder-large">
+                      <nb-icon icon="person-outline"></nb-icon>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Avatar Options Grid -->
+                <div class="avatar-options-grid">
                   <div 
-                    *ngFor="let avatar of availableAvatars" 
-                    class="avatar-option"
+                    *ngFor="let avatar of availableAvatars; let i = index" 
+                    class="avatar-option-small"
                     [class.selected]="userForm.avatar === avatar"
                     (click)="selectAvatar(avatar)">
-                    <img [src]="avatar" [alt]="'Avatar'" class="avatar-img">
-                    <nb-icon 
-                      *ngIf="userForm.avatar === avatar" 
-                      icon="checkmark-circle-2" 
-                      status="success"
-                      class="check-icon">
-                    </nb-icon>
+                    <img [src]="avatar" [alt]="'Avatar Option'" class="option-image">
                   </div>
+                </div>
+
+                <!-- Refresh Button -->
+                <div class="refresh-section">
+                  <button 
+                    type="button" 
+                    nbButton 
+                    status="primary" 
+                    size="small"
+                    (click)="generateAvatarOptions()">
+                    <nb-icon icon="refresh-outline"></nb-icon>
+                    换一批
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="row">
-            <div class="col-md-6">
+            <!-- User Info Section -->
+            <div class="col-md-8">
               <!-- Username -->
               <div class="form-group">
                 <label class="label" for="input-username">用户名</label>
@@ -76,9 +94,7 @@
                   </p>
                 </ng-container>
               </div>
-            </div>
 
-            <div class="col-md-6">
               <!-- Email -->
               <div class="form-group">
                 <label class="label" for="input-email">邮箱地址</label>
@@ -109,7 +125,7 @@
           <!-- Change Password Section -->
           <div class="row mt-3">
             <div class="col-md-12">
-              <nb-card accent="info">
+              <nb-card>
                 <nb-card-header>
                   <div class="d-flex align-items-center justify-content-between">
                     <span>修改密码</span>
@@ -197,23 +213,25 @@
           <!-- Action Buttons -->
           <div class="row mt-3">
             <div class="col-md-12">
-              <button 
-                nbButton 
-                status="success"
-                type="submit"
-                [disabled]="submitted || !form.valid">
-                <nb-icon icon="save-outline"></nb-icon>
-                {{ submitted ? '保存中...' : '保存更改' }}
-              </button>
-              <button 
-                nbButton 
-                status="basic"
-                type="button"
-                class="ml-2"
-                (click)="onCancel()">
-                <nb-icon icon="close-outline"></nb-icon>
-                取消
-              </button>
+              <div class="d-flex justify-content-end">
+                <button 
+                  nbButton 
+                  status="basic"
+                  type="button"
+                  class="mr-2"
+                  (click)="onCancel()">
+                  <nb-icon icon="close-outline"></nb-icon>
+                  取消
+                </button>
+                <button 
+                  nbButton 
+                  status="success"
+                  type="submit"
+                  [disabled]="submitted || !form.valid">
+                  <nb-icon icon="save-outline"></nb-icon>
+                  {{ submitted ? '保存中...' : '保存更改' }}
+                </button>
+              </div>
             </div>
           </div>
         </form>
