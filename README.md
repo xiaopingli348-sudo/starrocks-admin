@@ -3,7 +3,7 @@
 <div align="center">
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![License](https://img.shields.io/badge/license-MIT-blue)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Version](https://img.shields.io/badge/version-0.1.0-orange)
 ![Rust](https://img.shields.io/badge/rust-1.75+-red)
 ![Angular](https://img.shields.io/badge/angular-15+-red)
@@ -145,23 +145,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - [Nebular](https://John.github.io/nebular/) - Beautiful UI component library
 - [Axum](https://github.com/tokio-rs/axum) - Powerful Rust web framework
 - [StarRocks](https://www.starrocks.io/) - High-performance analytical database
-
-## Donation Support
-
-<div align="center">
-
-![Donation QR Code](docs/images/wx.png)
-
-**Your donation will help me continue open-source development. Thank you very much.**
-
 ---
-
-**Made with ❤️ for StarRocks Community**
-
 [↑ Back to Top](#starrocks-admin)
-
-</div>
-
 ---
 
 # 中文版
