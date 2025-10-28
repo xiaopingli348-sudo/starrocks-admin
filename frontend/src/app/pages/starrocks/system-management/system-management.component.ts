@@ -122,18 +122,14 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
     this.clusterContext.activeCluster$
       .pipe(takeUntil(this.destroy$))
       .subscribe(cluster => {
-        console.log('[SystemManagement] Active cluster changed:', cluster);
         this.activeCluster = cluster;
         if (cluster) {
           // Always use the active cluster (override route parameter)
           const newClusterId = cluster.id;
           if (this.clusterId !== newClusterId) {
-            console.log('[SystemManagement] Switching cluster from', this.clusterId, 'to', newClusterId);
             this.clusterId = newClusterId;
             this.loadSystemFunctions();
           }
-        } else {
-          console.log('[SystemManagement] No active cluster');
         }
       });
 
@@ -151,19 +147,16 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
   // 加载系统功能（从数据库加载所有功能）
   loadSystemFunctions() {
     if (!this.clusterId) {
-      console.log('[SystemManagement] No clusterId, skipping loadSystemFunctions');
       return;
     }
     
-    console.log('[SystemManagement] Loading system functions for clusterId:', this.clusterId);
     this.loading = true;
     
     // 从数据库加载所有功能（包括默认和自定义）
-    this.systemFunctionService.getFunctions(this.clusterId)
+    this.systemFunctionService.getFunctions()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (allFunctions) => {
-          console.log('[SystemManagement] Loaded functions:', allFunctions.length, allFunctions);
           // 所有功能都从数据库加载，不再区分系统/自定义
           this.customFunctions = allFunctions;
           this.mergeAndOrganizeFunctions();
@@ -179,7 +172,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
 
   // 整理功能（所有功能都从数据库加载）
   mergeAndOrganizeFunctions() {
-    console.log('[SystemManagement] mergeAndOrganizeFunctions called with customFunctions:', this.customFunctions.length);
     
     // 所有功能都从数据库加载，包括系统默认功能和自定义功能
     const allFunctions = this.customFunctions;
@@ -204,7 +196,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
       categoryMap.get(func.categoryName)!.push(func);
     });
 
-    console.log('[SystemManagement] Category map:', categoryMap);
 
     // 转换为 FunctionCategory 数组
     this.categories = Array.from(categoryMap.entries()).map(([name, functions]) => ({
@@ -213,7 +204,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
       order: functions[0]?.categoryOrder || 0
     })).sort((a, b) => a.order - b.order);
     
-    console.log('[SystemManagement] Final categories:', this.categories);
   }
 
   // 打开添加功能对话框
@@ -256,7 +246,7 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
 
   // 创建自定义功能
   createCustomFunction(request: CreateFunctionRequest) {
-    this.systemFunctionService.createFunction(this.clusterId, request)
+    this.systemFunctionService.createFunction(request)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (newFunction) => {
@@ -273,7 +263,7 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
 
   // 更新自定义功能
   updateCustomFunction(func: SystemFunction) {
-    this.systemFunctionService.updateFunction(this.clusterId, func.id, {
+    this.systemFunctionService.updateFunction(func.id, {
       category_name: func.categoryName,
       function_name: func.functionName,
       description: func.description,
@@ -348,7 +338,7 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
     });
 
     if (orders.length > 0) {
-      this.systemFunctionService.updateOrders(this.clusterId, { functions: orders })
+      this.systemFunctionService.updateOrders({ functions: orders })
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: () => {
@@ -378,7 +368,7 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
     });
 
     if (orders.length > 0) {
-      this.systemFunctionService.updateOrders(this.clusterId, { functions: orders })
+      this.systemFunctionService.updateOrders({ functions: orders })
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: () => {
@@ -394,7 +384,7 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
 
   // 切换收藏状态
   toggleFavorite(functionId: number) {
-    this.systemFunctionService.toggleFavorite(this.clusterId, functionId)
+    this.systemFunctionService.toggleFavorite(functionId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (updatedFunction) => {
@@ -418,7 +408,7 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
 
   // 删除自定义功能
   deleteFunction(functionId: number) {
-    this.systemFunctionService.deleteFunction(this.clusterId, functionId)
+    this.systemFunctionService.deleteFunction(functionId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -455,7 +445,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
       canNavigate: false
     };
     
-    console.log('[SystemManagement] Select function. History stack:', this.navigationHistory);
     this.loadFunctionData(func.name);
   }
 
@@ -463,14 +452,12 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
   executeCustomFunction(func: SystemFunction) {
     if (func.isSystem) {
       // 系统功能使用HTTP查询
-      console.log('[SystemManagement] Executing system function:', func.functionName);
       
       // 更新系统功能访问时间
       this.systemFunctionService.updateSystemFunctionAccessTime(func.functionName)
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: () => {
-            console.log('[SystemManagement] Updated access time for:', func.functionName);
           },
           error: (error) => {
             console.warn('[SystemManagement] Failed to update access time:', error);
@@ -489,7 +476,7 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
       this.loadFunctionData(func.functionName);
     } else {
       // 自定义功能使用MySQL查询
-      this.systemFunctionService.executeFunction(this.clusterId, func.id)
+      this.systemFunctionService.executeFunction(func.id)
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: (result) => {
@@ -531,7 +518,7 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
     
     this.loading = true;
     
-    this.nodeService.getSystemFunctionDetail(this.clusterId, functionName, nestedPath).subscribe({
+    this.nodeService.getSystemFunctionDetail(functionName, nestedPath).subscribe({
       next: (data: any) => {
         this.functionData = data.data || [];
 
@@ -552,7 +539,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
         this.setupTableSettings(); // 再设置表格配置
         this.loading = false;
 
-        console.log('[SystemManagement] Function data loaded:', functionName, nestedPath, this.functionData.length, 'rows');
       },
       error: (error) => {
         console.error('[SystemManagement] Failed to load function data:', error);
@@ -577,7 +563,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
       canNavigate: this.needsNestedNavigation(functionName) && this.functionData.length > 0
     };
     
-    console.log('[SystemManagement] Navigation state updated:', this.navigationState);
   }
 
   // 设置表格配置
@@ -654,7 +639,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
       fullPath: `/${this.selectedFunction.name}/${newNestedPath}`
     });
     
-    console.log('[SystemManagement] Navigate to child. History stack:', this.navigationHistory);
     this.loadFunctionData(this.selectedFunction.name, newNestedPath);
   }
 
@@ -666,8 +650,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
       
       // 获取上一级历史记录
       const previousHistory = this.navigationHistory[this.navigationHistory.length - 1];
-      
-      console.log('[SystemManagement] Go back. History stack:', this.navigationHistory, 'Previous:', previousHistory);
       
       // 加载上一级数据
       this.loadFunctionData(previousHistory.functionName, previousHistory.nestedPath);
@@ -690,8 +672,6 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
     if (this.selectedFunction && this.navigationHistory.length > 0) {
       // 获取当前历史记录（栈顶）
       const currentHistory = this.navigationHistory[this.navigationHistory.length - 1];
-      
-      console.log('[SystemManagement] Refresh current. History:', currentHistory);
       
       // 重新加载当前层级的数据
       this.loadFunctionData(currentHistory.functionName, currentHistory.nestedPath);

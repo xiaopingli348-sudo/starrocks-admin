@@ -67,33 +67,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.clusterService.listClusters().subscribe({
       next: (clusters) => {
-        this.updateClusters(clusters);
+        // Update clusters, setting isActive based on backend response
+        this.clusters = clusters.map((cluster) => ({
+          cluster,
+          loading: false,
+          isActive: cluster.is_active,
+        }));
+        
+        // Refresh active cluster from backend
+        this.clusterContext.refreshActiveCluster();
+        
         this.loadHealthStatus();
-        
-        // Try to restore active cluster from localStorage
-        const savedClusterId = this.clusterContext.getSavedClusterId();
-        console.log('[Dashboard] Saved cluster ID from localStorage:', savedClusterId);
-        
-        if (savedClusterId && !this.activeCluster) {
-          const savedCluster = clusters.find(c => c.id === savedClusterId);
-          if (savedCluster) {
-            console.log('[Dashboard] Restoring saved cluster:', savedCluster);
-            this.clusterContext.setActiveCluster(savedCluster);
-            this.toastrService.success(`已恢复激活集群: ${savedCluster.name}`, '提示');
-          } else {
-            console.log('[Dashboard] Saved cluster not found, clearing saved ID');
-            // Saved cluster no longer exists, clear localStorage
-            this.clusterContext.clearActiveCluster();
-          }
-        } else if (clusters.length === 1 && !this.activeCluster) {
-          // Auto-activate the first cluster if:
-          // 1. There is exactly one cluster
-          // 2. No cluster is currently active
-          console.log('[Dashboard] Auto-activating single cluster:', clusters[0]);
-          this.clusterContext.setActiveCluster(clusters[0]);
-          this.toastrService.success(`已自动激活集群: ${clusters[0].name}`, '提示');
-        }
-        
         this.loading = false;
       },
       error: (error) => {
@@ -104,35 +88,32 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   updateClusters(clusters: Cluster[]): void {
-    const activeId = this.activeCluster?.id;
+    // Update clusters, setting isActive based on backend is_active field
     this.clusters = clusters.map((cluster) => ({
       cluster,
       loading: false,
-      isActive: cluster.id === activeId,
+      isActive: cluster.is_active,
     }));
   }
 
   updateActiveStatus(): void {
-    const activeId = this.activeCluster?.id;
+    // isActive status now comes from backend
+    // Just need to refresh the display
     this.clusters.forEach(card => {
-      card.isActive = card.cluster.id === activeId;
+      // Status is already set from loadClusters based on is_active field
     });
   }
 
-  toggleActiveCluster(clusterCard: ClusterCard): void {
-    const isCurrentlyActive = this.activeCluster?.id === clusterCard.cluster.id;
-    
-    if (isCurrentlyActive) {
-      // Deactivate current cluster
-      console.log('[Dashboard] Deactivating cluster:', clusterCard.cluster);
-      this.clusterContext.clearActiveCluster();
-      this.toastrService.info('已取消激活集群', '提示');
-    } else {
-      // Activate new cluster (automatically deactivates previous)
-      console.log('[Dashboard] Activating cluster:', clusterCard.cluster);
-      this.clusterContext.setActiveCluster(clusterCard.cluster);
-      this.toastrService.success(`已激活集群: ${clusterCard.cluster.name}`, '成功');
+  toggleActiveCluster(clusterCard: ClusterCard) {
+    if (clusterCard.isActive) {
+      this.toastrService.warning('此集群已是活跃状态', '提示');
+      return;
     }
+    this.clusterContext.setActiveCluster(clusterCard.cluster);
+    this.toastrService.success(`已激活集群: ${clusterCard.cluster.name}`, '成功');
+      
+      // Reload clusters to update is_active status
+      setTimeout(() => this.loadClusters(), 500);
   }
 
   loadHealthStatus(): void {
@@ -163,48 +144,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  navigateToCluster(clusterId: number): void {
-    // 先设置激活集群，然后导航到集群列表
-    const cluster = this.clusters.find(c => c.cluster.id === clusterId)?.cluster;
-    if (cluster) {
-      this.clusterContext.setActiveCluster(cluster);
-    }
+  navigateToCluster(): void {
     this.router.navigate(['/pages/starrocks/clusters']);
   }
 
-  navigateToBackends(clusterId: number): void {
-    // 先设置激活集群，然后导航到后端节点页面
-    const cluster = this.clusters.find(c => c.cluster.id === clusterId)?.cluster;
-    if (cluster) {
-      this.clusterContext.setActiveCluster(cluster);
-    }
+  navigateToBackends(): void {
     this.router.navigate(['/pages/starrocks/backends']);
   }
 
-  navigateToFrontends(clusterId: number): void {
-    // 先设置激活集群，然后导航到前端节点页面
-    const cluster = this.clusters.find(c => c.cluster.id === clusterId)?.cluster;
-    if (cluster) {
-      this.clusterContext.setActiveCluster(cluster);
-    }
+  navigateToFrontends(): void {
     this.router.navigate(['/pages/starrocks/frontends']);
   }
 
-  navigateToMonitor(clusterId: number): void {
-    // 先设置激活集群，然后导航到监控页面
-    const cluster = this.clusters.find(c => c.cluster.id === clusterId)?.cluster;
-    if (cluster) {
-      this.clusterContext.setActiveCluster(cluster);
-    }
-    this.router.navigate(['/pages/starrocks/monitor']);
-  }
-
-  navigateToQueries(clusterId: number): void {
-    // 先设置激活集群，然后导航到查询页面
-    const cluster = this.clusters.find(c => c.cluster.id === clusterId)?.cluster;
-    if (cluster) {
-      this.clusterContext.setActiveCluster(cluster);
-    }
+  navigateToQueries(): void {
     this.router.navigate(['/pages/starrocks/queries']);
   }
 

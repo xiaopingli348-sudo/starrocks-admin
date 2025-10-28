@@ -1,17 +1,15 @@
-use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
-use std::time::Duration;
+use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 use std::path::Path;
+use std::time::Duration;
 
 pub async fn create_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
     tracing::info!("Initializing database connection: {}", database_url);
-    
-    if let Some(dir) = std::path::Path::new(database_url.trim_start_matches("sqlite://"))
-        .parent()
-    {
+
+    if let Some(dir) = std::path::Path::new(database_url.trim_start_matches("sqlite://")).parent() {
         tracing::debug!("Creating database directory: {:?}", dir);
         std::fs::create_dir_all(dir).ok();
     }
-    
+
     // 确保数据库文件存在
     let db_path = database_url.trim_start_matches("sqlite://");
     if !std::path::Path::new(db_path).exists() {
@@ -33,7 +31,7 @@ pub async fn create_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> 
     // Find migrations directory
     let migrations_path = find_migrations_dir();
     tracing::info!("Using migrations from: {}", migrations_path);
-    
+
     tracing::debug!("Running database migrations...");
     // Run migrations
     sqlx::migrate::Migrator::new(Path::new(&migrations_path))
@@ -57,18 +55,18 @@ pub async fn create_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> 
 fn find_migrations_dir() -> String {
     // Try different possible locations for migrations
     let possible_paths = [
-        "./migrations",                    // Production mode (when running from dist root)
-        "../migrations",                   // When running from bin/
-        "migrations",                      // When running from project root
+        "./migrations",  // Production mode (when running from dist root)
+        "../migrations", // When running from bin/
+        "migrations",    // When running from project root
     ];
-    
+
     for path in &possible_paths {
         if Path::new(path).exists() {
             tracing::debug!("Found migrations directory at: {}", path);
             return path.to_string();
         }
     }
-    
+
     // Default fallback
     tracing::warn!("No migrations directory found, using default: ./migrations");
     "./migrations".to_string()

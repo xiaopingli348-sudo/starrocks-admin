@@ -119,7 +119,6 @@ export class FrontendsComponent implements OnInit, OnDestroy {
           // Always use the active cluster (override route parameter)
           const newClusterId = cluster.id;
           if (this.clusterId !== newClusterId) {
-            console.log('[Frontends] Active cluster changed, switching from', this.clusterId, 'to', newClusterId);
             this.clusterId = newClusterId;
             this.loadClusterInfo();
             this.loadFrontends();
@@ -139,7 +138,7 @@ export class FrontendsComponent implements OnInit, OnDestroy {
     interval(10000)
       .pipe(
         takeUntil(this.destroy$),
-        switchMap(() => this.nodeService.listFrontends(this.clusterId)),
+        switchMap(() => this.nodeService.listFrontends()),
       )
       .subscribe({
         next: (frontends) => {
@@ -163,7 +162,7 @@ export class FrontendsComponent implements OnInit, OnDestroy {
 
   loadFrontends(): void {
     this.loading = true;
-    this.nodeService.listFrontends(this.clusterId).subscribe({
+    this.nodeService.listFrontends().subscribe({
       next: (frontends) => {
         this.source.load(frontends);
         this.loading = false;

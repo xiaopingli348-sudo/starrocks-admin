@@ -21,11 +21,9 @@ impl MaterializedViewService {
 
         if let Some(db) = database {
             // Query specific database - run async and sync queries concurrently
-            let (async_result, sync_result) = tokio::join!(
-                self.get_async_mvs_from_db(db),
-                self.get_sync_mvs_from_db(db)
-            );
-            
+            let (async_result, sync_result) =
+                tokio::join!(self.get_async_mvs_from_db(db), self.get_sync_mvs_from_db(db));
+
             if let Ok(async_mvs) = async_result {
                 all_mvs.extend(async_mvs);
             }
@@ -36,45 +34,45 @@ impl MaterializedViewService {
             // Query all databases concurrently for better performance
             let databases = self.get_all_databases().await?;
             tracing::info!("Fetching MVs from {} databases concurrently", databases.len());
-            
+
             // Create concurrent tasks for each database using tokio::spawn
             let mut tasks = Vec::new();
-            
+
             for db in databases {
                 let mysql_client = self.mysql_client.clone();
-                
+
                 let task = tokio::spawn(async move {
                     let mut mvs = Vec::new();
-                    
+
                     // Fetch async MVs
                     let sql_async = format!("SHOW MATERIALIZED VIEWS FROM `{}`", db);
-                    if let Ok(results) = mysql_client.query(&sql_async).await {
-                        if let Ok(async_mvs) = Self::parse_async_mv_results(results, &db) {
-                            mvs.extend(async_mvs);
-                        }
+                    if let Ok(results) = mysql_client.query(&sql_async).await
+                        && let Ok(async_mvs) = Self::parse_async_mv_results(results, &db)
+                    {
+                        mvs.extend(async_mvs);
                     }
-                    
+
                     // Fetch sync MVs
                     let sql_sync = format!("SHOW ALTER MATERIALIZED VIEW FROM `{}`", db);
-                    if let Ok(results) = mysql_client.query(&sql_sync).await {
-                        if let Ok(sync_mvs) = Self::parse_sync_mv_results(results, &db) {
-                            mvs.extend(sync_mvs);
-                        }
+                    if let Ok(results) = mysql_client.query(&sql_sync).await
+                        && let Ok(sync_mvs) = Self::parse_sync_mv_results(results, &db)
+                    {
+                        mvs.extend(sync_mvs);
                     }
-                    
+
                     mvs
                 });
-                
+
                 tasks.push(task);
             }
-            
+
             // Collect all results
             for task in tasks {
                 if let Ok(mvs) = task.await {
                     all_mvs.extend(mvs);
                 }
             }
-            
+
             tracing::info!("Total MVs fetched: {}", all_mvs.len());
         }
 
@@ -88,51 +86,42 @@ impl MaterializedViewService {
 
         for db in &databases {
             // Try async MVs
-            if let Ok(mvs) = self.get_async_mvs_from_db(db).await {
-                if let Some(mv) = mvs.into_iter().find(|m| m.name == mv_name) {
-                    return Ok(mv);
-                }
+            if let Ok(mvs) = self.get_async_mvs_from_db(db).await
+                && let Some(mv) = mvs.into_iter().find(|m| m.name == mv_name)
+            {
+                return Ok(mv);
             }
 
             // Try sync MVs
-            if let Ok(mvs) = self.get_sync_mvs_from_db(db).await {
-                if let Some(mv) = mvs.into_iter().find(|m| m.name == mv_name) {
-                    return Ok(mv);
-                }
+            if let Ok(mvs) = self.get_sync_mvs_from_db(db).await
+                && let Some(mv) = mvs.into_iter().find(|m| m.name == mv_name)
+            {
+                return Ok(mv);
             }
         }
 
-        Err(ApiError::not_found(format!(
-            "Materialized view '{}' not found",
-            mv_name
-        )))
+        Err(ApiError::not_found(format!("Materialized view '{}' not found", mv_name)))
     }
 
     /// Get DDL for a materialized view
     pub async fn get_materialized_view_ddl(&self, mv_name: &str) -> ApiResult<String> {
         // First, find which database the MV belongs to
         let mv = self.get_materialized_view(mv_name).await?;
-        
+
         // Use the database name to query DDL
-        let sql = format!(
-            "SHOW CREATE MATERIALIZED VIEW `{}`.`{}`",
-            mv.database_name, mv_name
-        );
+        let sql = format!("SHOW CREATE MATERIALIZED VIEW `{}`.`{}`", mv.database_name, mv_name);
         tracing::info!("Querying materialized view DDL: {}", sql);
 
         let results = self.mysql_client.query(&sql).await?;
 
         // Extract DDL from result
-        if let Some(row) = results.first() {
-            if let Some(ddl) = row.get("Create Materialized View").and_then(|v| v.as_str()) {
-                return Ok(ddl.to_string());
-            }
+        if let Some(row) = results.first()
+            && let Some(ddl) = row.get("Create Materialized View").and_then(|v| v.as_str())
+        {
+            return Ok(ddl.to_string());
         }
 
-        Err(ApiError::not_found(format!(
-            "DDL for materialized view '{}' not found",
-            mv_name
-        )))
+        Err(ApiError::not_found(format!("DDL for materialized view '{}' not found", mv_name)))
     }
 
     /// Create a materialized view
@@ -154,7 +143,7 @@ impl MaterializedViewService {
         } else {
             Some(self.get_materialized_view(mv_name).await?.database_name)
         };
-        
+
         let sql = if let Some(db) = database {
             if if_exists {
                 format!("DROP MATERIALIZED VIEW IF EXISTS `{}`.`{}`", db, mv_name)
@@ -165,7 +154,7 @@ impl MaterializedViewService {
             // Fallback for IF EXISTS when MV not found
             format!("DROP MATERIALIZED VIEW IF EXISTS `{}`", mv_name)
         };
-        
+
         tracing::info!("Dropping materialized view: {}", sql);
         self.mysql_client.execute(&sql).await?;
         Ok(())
@@ -182,12 +171,9 @@ impl MaterializedViewService {
     ) -> ApiResult<()> {
         // First, find which database the MV belongs to
         let mv = self.get_materialized_view(mv_name).await?;
-        
+
         // Build SQL with database name
-        let mut sql = format!(
-            "REFRESH MATERIALIZED VIEW `{}`.`{}`",
-            mv.database_name, mv_name
-        );
+        let mut sql = format!("REFRESH MATERIALIZED VIEW `{}`.`{}`", mv.database_name, mv_name);
 
         if let (Some(start), Some(end)) = (partition_start, partition_end) {
             sql.push_str(&format!(" PARTITION START ('{}') END ('{}')", start, end));
@@ -212,17 +198,11 @@ impl MaterializedViewService {
     ) -> ApiResult<()> {
         // First, find which database the MV belongs to
         let mv = self.get_materialized_view(mv_name).await?;
-        
+
         let sql = if force {
-            format!(
-                "CANCEL REFRESH MATERIALIZED VIEW `{}`.`{}` FORCE",
-                mv.database_name, mv_name
-            )
+            format!("CANCEL REFRESH MATERIALIZED VIEW `{}`.`{}` FORCE", mv.database_name, mv_name)
         } else {
-            format!(
-                "CANCEL REFRESH MATERIALIZED VIEW `{}`.`{}`",
-                mv.database_name, mv_name
-            )
+            format!("CANCEL REFRESH MATERIALIZED VIEW `{}`.`{}`", mv.database_name, mv_name)
         };
         tracing::info!("Cancelling refresh for materialized view: {}", sql);
         self.mysql_client.execute(&sql).await?;
@@ -237,7 +217,7 @@ impl MaterializedViewService {
     ) -> ApiResult<()> {
         // First, find which database the MV belongs to
         let mv = self.get_materialized_view(mv_name).await?;
-        
+
         let sql = format!(
             "ALTER MATERIALIZED VIEW `{}`.`{}` {}",
             mv.database_name, mv_name, alter_clause
@@ -420,4 +400,3 @@ impl MaterializedViewService {
         Ok(mvs)
     }
 }
-

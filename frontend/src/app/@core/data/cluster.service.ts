@@ -14,6 +14,7 @@ export interface Cluster {
   connection_timeout: number;
   tags: string[];
   catalog: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +69,14 @@ export class ClusterService {
 
   deleteCluster(id: number): Observable<any> {
     return this.api.delete(`/clusters/${id}`);
+  }
+
+  getActiveCluster(): Observable<Cluster> {
+    return this.api.get<Cluster>('/clusters/active');
+  }
+
+  activateCluster(id: number): Observable<Cluster> {
+    return this.api.put<Cluster>(`/clusters/${id}/activate`, {});
   }
 
   // Get cluster health (supports both modes)

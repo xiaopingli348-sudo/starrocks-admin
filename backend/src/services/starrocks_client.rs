@@ -1,11 +1,10 @@
 use crate::models::{
-    Backend, Cluster, Frontend, MaterializedView, Query, RuntimeInfo,
+    Backend, Cluster, Database, Frontend, MaterializedView, Query, RuntimeInfo, SchemaChange, Table,
 };
 use crate::utils::{ApiError, ApiResult};
 use reqwest::Client;
 use serde_json::Value;
 use std::time::Duration;
-
 
 pub struct StarRocksClient {
     pub http_client: Client,
@@ -19,22 +18,12 @@ impl StarRocksClient {
             .build()
             .unwrap_or_default();
 
-        Self {
-            http_client,
-            cluster,
-        }
+        Self { http_client, cluster }
     }
 
     pub fn get_base_url(&self) -> String {
-        let protocol = if self.cluster.enable_ssl {
-            "https"
-        } else {
-            "http"
-        };
-        format!(
-            "{}://{}:{}",
-            protocol, self.cluster.fe_host, self.cluster.fe_http_port
-        )
+        let protocol = if self.cluster.enable_ssl { "https" } else { "http" };
+        format!("{}://{}:{}", protocol, self.cluster.fe_host, self.cluster.fe_http_port)
     }
 
     // Get backends via HTTP API
@@ -103,9 +92,10 @@ impl StarRocksClient {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             tracing::error!("SQL execution failed with status {}: {}", status, error_text);
-            return Err(ApiError::cluster_connection_failed(
-                format!("SQL execution failed: {}", error_text)
-            ));
+            return Err(ApiError::cluster_connection_failed(format!(
+                "SQL execution failed: {}",
+                error_text
+            )));
         }
 
         tracing::info!("SQL executed successfully: {}", sql);
@@ -160,10 +150,7 @@ impl StarRocksClient {
 
     // Get current queries
     pub async fn get_queries(&self) -> ApiResult<Vec<Query>> {
-        let url = format!(
-            "{}/api/show_proc?path=/current_queries",
-            self.get_base_url()
-        );
+        let url = format!("{}/api/show_proc?path=/current_queries", self.get_base_url());
 
         let response = self
             .http_client
@@ -174,24 +161,48 @@ impl StarRocksClient {
             .map_err(|e| ApiError::cluster_connection_failed(format!("Request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            return Err(ApiError::cluster_connection_failed(format!(
-                "HTTP status: {}",
-                response.status()
-            )));
+            tracing::warn!("Failed to fetch current_queries, HTTP status: {}", response.status());
+            return Ok(Vec::new()); // Return empty list on HTTP errors
         }
 
         let data: Value = response.json().await.map_err(|e| {
+            tracing::warn!("Failed to parse current_queries response: {}", e);
             ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
         })?;
 
-        // Try new format (direct array) first, then fall back to old format
-        if let Ok(queries) = serde_json::from_value::<Vec<Query>>(data.clone()) {
-            return Ok(queries);
+        tracing::debug!("StarRocks /current_queries response: {}", data);
+
+        // Handle empty array response (no running queries)
+        if data.is_array() {
+            match serde_json::from_value::<Vec<Query>>(data.clone()) {
+                Ok(queries) => {
+                    tracing::debug!("Parsed {} running queries from direct array", queries.len());
+                    return Ok(queries);
+                },
+                Err(e) => tracing::debug!("Failed to parse array format: {}", e),
+            }
         }
 
-        // Fallback to old format
-        let queries = Self::parse_proc_result::<Query>(&data)?;
-        Ok(queries)
+        // Handle empty object {} response
+        if data.is_object() && data.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+            tracing::debug!("StarRocks returned empty object, no running queries");
+            return Ok(Vec::new());
+        }
+
+        // Try fallback format parsing, but tolerate errors
+        match Self::parse_proc_result::<Query>(&data) {
+            Ok(queries) => {
+                tracing::debug!("Parsed {} running queries from PROC format", queries.len());
+                Ok(queries)
+            },
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse PROC format for current_queries: {}. Returning empty list.",
+                    e
+                );
+                Ok(Vec::new()) // Return empty list instead of failing
+            },
+        }
     }
 
     // Get runtime info
@@ -246,17 +257,34 @@ impl StarRocksClient {
         Ok(metrics_text)
     }
 
-
     // Parse PROC result format
     fn parse_proc_result<T: serde::de::DeserializeOwned>(data: &Value) -> ApiResult<Vec<T>> {
-        // StarRocks PROC result format: {"columnNames": [...], "rows": [[...]]}
-        let column_names = data["columnNames"]
-            .as_array()
-            .ok_or_else(|| ApiError::internal_error("Invalid PROC result format"))?;
+        // StarRocks PROC result format: {"columnNames": [...], "rows": [[...]]} or {"columns": [...], "rows": [...]}
 
-        let rows = data["rows"]
-            .as_array()
-            .ok_or_else(|| ApiError::internal_error("Invalid PROC result format"))?;
+        // Try to extract column names (support both "columnNames" and "columns" keys)
+        let column_names = if let Some(cols) = data["columnNames"].as_array() {
+            cols
+        } else if let Some(cols) = data["columns"].as_array() {
+            cols
+        } else {
+            // Log the actual data structure for debugging
+            tracing::warn!(
+                "Invalid PROC result format. Keys: {:?}, Data: {}",
+                data.as_object().map(|o| o.keys().collect::<Vec<_>>()),
+                data
+            );
+            return Err(ApiError::internal_error(format!(
+                "Invalid PROC result format. Expected 'columnNames' or 'columns' field. Got: {}",
+                data.as_object()
+                    .map(|o| o.keys().map(|k| k.as_str()).collect::<Vec<_>>())
+                    .unwrap_or_default()
+                    .join(", ")
+            )));
+        };
+
+        let rows = data["rows"].as_array().ok_or_else(|| {
+            ApiError::internal_error("Invalid PROC result format: missing 'rows' field")
+        })?;
 
         let mut results = Vec::new();
 
@@ -269,9 +297,10 @@ impl StarRocksClient {
             let mut obj = serde_json::Map::new();
             for (i, col_name) in column_names.iter().enumerate() {
                 if let Some(col_name_str) = col_name.as_str()
-                    && let Some(value) = row_array.get(i) {
-                        obj.insert(col_name_str.to_string(), value.clone());
-                    }
+                    && let Some(value) = row_array.get(i)
+                {
+                    obj.insert(col_name_str.to_string(), value.clone());
+                }
             }
 
             let item: T = serde_json::from_value(Value::Object(obj))
@@ -284,7 +313,10 @@ impl StarRocksClient {
     }
 
     // Parse Prometheus metrics format
-    pub fn parse_prometheus_metrics(&self, metrics_text: &str) -> ApiResult<std::collections::HashMap<String, f64>> {
+    pub fn parse_prometheus_metrics(
+        &self,
+        metrics_text: &str,
+    ) -> ApiResult<std::collections::HashMap<String, f64>> {
         let mut metrics = std::collections::HashMap::new();
 
         for line in metrics_text.lines() {
@@ -295,16 +327,14 @@ impl StarRocksClient {
 
             // Parse format: metric_name{labels} value
             if let Some((name_part, value_str)) = line.rsplit_once(' ')
-                && let Ok(value) = value_str.parse::<f64>() {
-                    // Extract metric name (before '{' or the whole name_part)
-                    let metric_name = if let Some(pos) = name_part.find('{') {
-                        &name_part[..pos]
-                    } else {
-                        name_part
-                    };
-                    
-                    metrics.insert(metric_name.to_string(), value);
-                }
+                && let Ok(value) = value_str.parse::<f64>()
+            {
+                // Extract metric name (before '{' or the whole name_part)
+                let metric_name =
+                    if let Some(pos) = name_part.find('{') { &name_part[..pos] } else { name_part };
+
+                metrics.insert(metric_name.to_string(), value);
+            }
         }
 
         Ok(metrics)
@@ -312,58 +342,59 @@ impl StarRocksClient {
 
     // Get materialized views list (both async and sync/ROLLUP)
     // If database is None, fetches MVs from all databases in the catalog
+    #[allow(dead_code)]
     pub async fn get_materialized_views(
         &self,
         database: Option<&str>,
     ) -> ApiResult<Vec<MaterializedView>> {
         let mut all_mvs = Vec::new();
-        
+
         // If database specified, only query that database
         if let Some(db) = database {
             // Get async MVs
             let async_mvs = self.get_async_materialized_views(Some(db)).await?;
             all_mvs.extend(async_mvs);
-            
+
             // Get sync MVs
-            let sync_mvs = self.get_sync_materialized_views(Some(db)).await.unwrap_or_default();
+            let sync_mvs = self
+                .get_sync_materialized_views(Some(db))
+                .await
+                .unwrap_or_default();
             all_mvs.extend(sync_mvs);
         } else {
             // Get all databases first, then query each database
             let databases = self.get_all_databases().await?;
-            
+
             for db in &databases {
                 // Get async MVs from this database
                 if let Ok(async_mvs) = self.get_async_materialized_views(Some(db)).await {
                     all_mvs.extend(async_mvs);
                 }
-                
+
                 // Get sync MVs from this database
                 if let Ok(sync_mvs) = self.get_sync_materialized_views(Some(db)).await {
                     all_mvs.extend(sync_mvs);
                 }
             }
         }
-        
+
         tracing::debug!("Retrieved {} total materialized views (async + sync)", all_mvs.len());
         Ok(all_mvs)
     }
-    
+
     // Get all databases in the catalog
+    #[allow(dead_code)]
     async fn get_all_databases(&self) -> ApiResult<Vec<String>> {
         let sql = "SHOW DATABASES";
         tracing::debug!("Fetching all databases with SQL: {}", sql);
-        
+
         let catalog = &self.cluster.catalog;
-        let url = format!(
-            "{}/api/v1/catalogs/{}/sql",
-            self.get_base_url(),
-            catalog
-        );
-        
+        let url = format!("{}/api/v1/catalogs/{}/sql", self.get_base_url(), catalog);
+
         let body = serde_json::json!({
             "query": sql
         });
-        
+
         let response = self
             .http_client
             .post(&url)
@@ -375,38 +406,39 @@ impl StarRocksClient {
                 tracing::error!("Failed to fetch databases: {}", e);
                 ApiError::cluster_connection_failed(format!("Request failed: {}", e))
             })?;
-        
+
         if !response.status().is_success() {
             tracing::warn!("Failed to fetch databases: {}", response.status());
             return Ok(Vec::new());
         }
-        
+
         let data: Value = response.json().await.map_err(|e| {
             ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
         })?;
-        
+
         // Parse SHOW DATABASES result
         let result_data = data.get("data").unwrap_or(&data);
         let mut databases = Vec::new();
-        
+
         if let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
             for row in rows {
-                if let Some(row_array) = row.as_array() {
-                    if let Some(db_name) = row_array.first().and_then(|v| v.as_str()) {
-                        // Skip system databases
-                        if db_name != "information_schema" && db_name != "_statistics_" {
-                            databases.push(db_name.to_string());
-                        }
+                if let Some(row_array) = row.as_array()
+                    && let Some(db_name) = row_array.first().and_then(|v| v.as_str())
+                {
+                    // Skip system databases
+                    if db_name != "information_schema" && db_name != "_statistics_" {
+                        databases.push(db_name.to_string());
                     }
                 }
             }
         }
-        
+
         tracing::debug!("Found {} databases", databases.len());
         Ok(databases)
     }
 
     // Get async materialized views only
+    #[allow(dead_code)]
     async fn get_async_materialized_views(
         &self,
         database: Option<&str>,
@@ -422,11 +454,7 @@ impl StarRocksClient {
 
         // Use /api/v1/catalogs/{catalog}/sql endpoint to execute SQL
         let catalog = &self.cluster.catalog;
-        let url = format!(
-            "{}/api/v1/catalogs/{}/sql",
-            self.get_base_url(),
-            catalog
-        );
+        let url = format!("{}/api/v1/catalogs/{}/sql", self.get_base_url(), catalog);
 
         let body = serde_json::json!({
             "query": sql
@@ -447,10 +475,15 @@ impl StarRocksClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            tracing::error!("Failed to fetch async materialized views with status {}: {}", status, error_text);
-            return Err(ApiError::cluster_connection_failed(
-                format!("HTTP status: {}", error_text)
-            ));
+            tracing::error!(
+                "Failed to fetch async materialized views with status {}: {}",
+                status,
+                error_text
+            );
+            return Err(ApiError::cluster_connection_failed(format!(
+                "HTTP status: {}",
+                error_text
+            )));
         }
 
         let data: Value = response.json().await.map_err(|e| {
@@ -465,6 +498,7 @@ impl StarRocksClient {
     }
 
     // Get sync materialized views (ROLLUP) from SHOW ALTER MATERIALIZED VIEW
+    #[allow(dead_code)]
     async fn get_sync_materialized_views(
         &self,
         database: Option<&str>,
@@ -478,11 +512,7 @@ impl StarRocksClient {
         tracing::debug!("Fetching sync materialized views with SQL: {}", sql);
 
         let catalog = &self.cluster.catalog;
-        let url = format!(
-            "{}/api/v1/catalogs/{}/sql",
-            self.get_base_url(),
-            catalog
-        );
+        let url = format!("{}/api/v1/catalogs/{}/sql", self.get_base_url(), catalog);
 
         let body = serde_json::json!({
             "query": sql
@@ -497,7 +527,7 @@ impl StarRocksClient {
             .await
             .map_err(|e| {
                 tracing::warn!("Failed to fetch sync materialized views: {}", e);
-                return ApiError::cluster_connection_failed(format!("Request failed: {}", e));
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
             })?;
 
         if !response.status().is_success() {
@@ -507,7 +537,7 @@ impl StarRocksClient {
 
         let data: Value = response.json().await.map_err(|e| {
             tracing::warn!("Failed to parse sync materialized views response: {}", e);
-            return ApiError::internal_error(format!("Failed to parse response: {}", e));
+            ApiError::internal_error(format!("Failed to parse response: {}", e))
         })?;
 
         // Parse SHOW ALTER MATERIALIZED VIEW result
@@ -517,16 +547,13 @@ impl StarRocksClient {
     }
 
     // Get single materialized view details
+    #[allow(dead_code)]
     pub async fn get_materialized_view(&self, mv_name: &str) -> ApiResult<MaterializedView> {
         let sql = format!("SHOW MATERIALIZED VIEWS WHERE NAME = '{}'", mv_name);
         tracing::debug!("Fetching materialized view details with SQL: {}", sql);
 
         let catalog = &self.cluster.catalog;
-        let url = format!(
-            "{}/api/v1/catalogs/{}/sql",
-            self.get_base_url(),
-            catalog
-        );
+        let url = format!("{}/api/v1/catalogs/{}/sql", self.get_base_url(), catalog);
 
         let body = serde_json::json!({
             "query": sql
@@ -539,9 +566,7 @@ impl StarRocksClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| {
-                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
-            })?;
+            .map_err(|e| ApiError::cluster_connection_failed(format!("Request failed: {}", e)))?;
 
         if !response.status().is_success() {
             return Err(ApiError::cluster_connection_failed(format!(
@@ -555,22 +580,19 @@ impl StarRocksClient {
         })?;
 
         let mvs = Self::parse_mv_result(&data)?;
-        mvs.into_iter()
-            .next()
-            .ok_or_else(|| ApiError::not_found(format!("Materialized view '{}' not found", mv_name)))
+        mvs.into_iter().next().ok_or_else(|| {
+            ApiError::not_found(format!("Materialized view '{}' not found", mv_name))
+        })
     }
 
     // Get materialized view DDL
+    #[allow(dead_code)]
     pub async fn get_materialized_view_ddl(&self, mv_name: &str) -> ApiResult<String> {
         let sql = format!("SHOW CREATE MATERIALIZED VIEW `{}`", mv_name);
         tracing::debug!("Fetching materialized view DDL with SQL: {}", sql);
 
         let catalog = &self.cluster.catalog;
-        let url = format!(
-            "{}/api/v1/catalogs/{}/sql",
-            self.get_base_url(),
-            catalog
-        );
+        let url = format!("{}/api/v1/catalogs/{}/sql", self.get_base_url(), catalog);
 
         let body = serde_json::json!({
             "query": sql
@@ -583,9 +605,7 @@ impl StarRocksClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| {
-                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
-            })?;
+            .map_err(|e| ApiError::cluster_connection_failed(format!("Request failed: {}", e)))?;
 
         if !response.status().is_success() {
             return Err(ApiError::cluster_connection_failed(format!(
@@ -600,59 +620,57 @@ impl StarRocksClient {
 
         // Extract DDL from result
         // SHOW CREATE MATERIALIZED VIEW returns: [[mv_name, create_statement]]
-        if let Some(rows) = data["data"].as_array() {
-            if let Some(row) = rows.first() {
-                if let Some(row_array) = row.as_array() {
-                    if let Some(ddl) = row_array.get(1) {
-                        if let Some(ddl_str) = ddl.as_str() {
-                            return Ok(ddl_str.to_string());
-                        }
-                    }
-                }
-            }
+        if let Some(rows) = data["data"].as_array()
+            && let Some(row) = rows.first()
+            && let Some(row_array) = row.as_array()
+            && let Some(ddl) = row_array.get(1)
+            && let Some(ddl_str) = ddl.as_str()
+        {
+            return Ok(ddl_str.to_string());
         }
 
         Err(ApiError::internal_error("Failed to extract DDL from response"))
     }
 
     // Parse materialized view result format
+    #[allow(dead_code)]
     fn parse_mv_result(data: &Value) -> ApiResult<Vec<MaterializedView>> {
         // Check if data has "data" field (new format) or use root (old format)
         let result_data = data.get("data").unwrap_or(data);
-        
+
         // Try to parse as array of objects directly
         if let Ok(mvs) = serde_json::from_value::<Vec<MaterializedView>>(result_data.clone()) {
             return Ok(mvs);
         }
 
         // Try PROC result format: {"columnNames": [...], "rows": [[...]]}
-        if let Some(column_names) = result_data.get("columnNames").and_then(|v| v.as_array()) {
-            if let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
-                let mut results = Vec::new();
+        if let Some(column_names) = result_data.get("columnNames").and_then(|v| v.as_array())
+            && let Some(rows) = result_data.get("rows").and_then(|v| v.as_array())
+        {
+            let mut results = Vec::new();
 
-                for row in rows {
-                    let row_array = row
-                        .as_array()
-                        .ok_or_else(|| ApiError::internal_error("Invalid row format"))?;
+            for row in rows {
+                let row_array = row
+                    .as_array()
+                    .ok_or_else(|| ApiError::internal_error("Invalid row format"))?;
 
-                    // Create a JSON object from column names and row values
-                    let mut obj = serde_json::Map::new();
-                    for (i, col_name) in column_names.iter().enumerate() {
-                        if let Some(col_name_str) = col_name.as_str() {
-                            if let Some(value) = row_array.get(i) {
-                                obj.insert(col_name_str.to_string(), value.clone());
-                            }
-                        }
+                // Create a JSON object from column names and row values
+                let mut obj = serde_json::Map::new();
+                for (i, col_name) in column_names.iter().enumerate() {
+                    if let Some(col_name_str) = col_name.as_str()
+                        && let Some(value) = row_array.get(i)
+                    {
+                        obj.insert(col_name_str.to_string(), value.clone());
                     }
-
-                    let mv: MaterializedView = serde_json::from_value(Value::Object(obj))
-                        .map_err(|e| ApiError::internal_error(format!("Failed to parse MV: {}", e)))?;
-
-                    results.push(mv);
                 }
 
-                return Ok(results);
+                let mv: MaterializedView = serde_json::from_value(Value::Object(obj))
+                    .map_err(|e| ApiError::internal_error(format!("Failed to parse MV: {}", e)))?;
+
+                results.push(mv);
             }
+
+            return Ok(results);
         }
 
         Err(ApiError::internal_error("Unsupported materialized view result format"))
@@ -660,95 +678,255 @@ impl StarRocksClient {
 
     // Parse SHOW ALTER MATERIALIZED VIEW result to MaterializedView format
     // Returns FINISHED sync MVs only
-    fn parse_sync_mv_result(data: &Value, database: Option<&str>) -> ApiResult<Vec<MaterializedView>> {
+    #[allow(dead_code)]
+    fn parse_sync_mv_result(
+        data: &Value,
+        database: Option<&str>,
+    ) -> ApiResult<Vec<MaterializedView>> {
         let result_data = data.get("data").unwrap_or(data);
-        
+
         // Try PROC result format: {"columnNames": [...], "rows": [[...]]}
-        if let Some(column_names) = result_data.get("columnNames").and_then(|v| v.as_array()) {
-            if let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
-                let mut results = Vec::new();
+        if let Some(column_names) = result_data.get("columnNames").and_then(|v| v.as_array())
+            && let Some(rows) = result_data.get("rows").and_then(|v| v.as_array())
+        {
+            let mut results = Vec::new();
 
-                // Find column indices
-                let mut table_name_idx = None;
-                let mut rollup_name_idx = None;
-                let mut state_idx = None;
-                let mut create_time_idx = None;
-                let mut finished_time_idx = None;
+            // Find column indices
+            let mut table_name_idx = None;
+            let mut rollup_name_idx = None;
+            let mut state_idx = None;
+            let mut create_time_idx = None;
+            let mut finished_time_idx = None;
 
-                for (i, col_name) in column_names.iter().enumerate() {
-                    if let Some(col_str) = col_name.as_str() {
-                        match col_str {
-                            "TableName" => table_name_idx = Some(i),
-                            "RollupIndexName" => rollup_name_idx = Some(i),
-                            "State" => state_idx = Some(i),
-                            "CreateTime" => create_time_idx = Some(i),
-                            "FinishedTime" => finished_time_idx = Some(i),
-                            _ => {}
-                        }
+            for (i, col_name) in column_names.iter().enumerate() {
+                if let Some(col_str) = col_name.as_str() {
+                    match col_str {
+                        "TableName" => table_name_idx = Some(i),
+                        "RollupIndexName" => rollup_name_idx = Some(i),
+                        "State" => state_idx = Some(i),
+                        "CreateTime" => create_time_idx = Some(i),
+                        "FinishedTime" => finished_time_idx = Some(i),
+                        _ => {},
                     }
                 }
-
-                for row in rows {
-                    if let Some(row_array) = row.as_array() {
-                        // Only include FINISHED sync MVs
-                        if let Some(state_idx) = state_idx {
-                            if let Some(state) = row_array.get(state_idx).and_then(|v| v.as_str()) {
-                                if state != "FINISHED" {
-                                    continue; // Skip non-finished MVs
-                                }
-                            }
-                        }
-
-                        // Extract values
-                        let mv_name = rollup_name_idx
-                            .and_then(|idx| row_array.get(idx))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string();
-
-                        let table_name = table_name_idx
-                            .and_then(|idx| row_array.get(idx))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string();
-
-                        let create_time = create_time_idx
-                            .and_then(|idx| row_array.get(idx))
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-
-                        let finished_time = finished_time_idx
-                            .and_then(|idx| row_array.get(idx))
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-
-                        // Build MaterializedView struct for sync MV
-                        let mv = MaterializedView {
-                            id: format!("sync_{}", mv_name), // Generate ID for sync MVs
-                            name: mv_name.clone(),
-                            database_name: database.unwrap_or("").to_string(),
-                            refresh_type: "ROLLUP".to_string(), // Sync MVs are ROLLUP type
-                            is_active: true, // FINISHED state means active
-                            partition_type: None, // Sync MVs don't have partition info from SHOW ALTER
-                            task_id: None,
-                            task_name: None,
-                            last_refresh_start_time: create_time,
-                            last_refresh_finished_time: finished_time,
-                            last_refresh_duration: None,
-                            last_refresh_state: Some("SUCCESS".to_string()),
-                            rows: None,
-                            text: format!("-- Sync materialized view on table: {}", table_name),
-                        };
-
-                        results.push(mv);
-                    }
-                }
-
-                return Ok(results);
             }
+
+            for row in rows {
+                if let Some(row_array) = row.as_array() {
+                    // Only include FINISHED sync MVs
+                    if let Some(state_idx) = state_idx
+                        && let Some(state) = row_array.get(state_idx).and_then(|v| v.as_str())
+                        && state != "FINISHED"
+                    {
+                        continue; // Skip non-finished MVs
+                    }
+
+                    // Extract values
+                    let mv_name = rollup_name_idx
+                        .and_then(|idx| row_array.get(idx))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let table_name = table_name_idx
+                        .and_then(|idx| row_array.get(idx))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let create_time = create_time_idx
+                        .and_then(|idx| row_array.get(idx))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+
+                    let finished_time = finished_time_idx
+                        .and_then(|idx| row_array.get(idx))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+
+                    // Build MaterializedView struct for sync MV
+                    let mv = MaterializedView {
+                        id: format!("sync_{}", mv_name), // Generate ID for sync MVs
+                        name: mv_name.clone(),
+                        database_name: database.unwrap_or("").to_string(),
+                        refresh_type: "ROLLUP".to_string(), // Sync MVs are ROLLUP type
+                        is_active: true,                    // FINISHED state means active
+                        partition_type: None, // Sync MVs don't have partition info from SHOW ALTER
+                        task_id: None,
+                        task_name: None,
+                        last_refresh_start_time: create_time,
+                        last_refresh_finished_time: finished_time,
+                        last_refresh_duration: None,
+                        last_refresh_state: Some("SUCCESS".to_string()),
+                        rows: None,
+                        text: format!("-- Sync materialized view on table: {}", table_name),
+                    };
+
+                    results.push(mv);
+                }
+            }
+
+            return Ok(results);
         }
 
         Ok(Vec::new()) // Return empty if can't parse
     }
-}
 
+    // ========================================
+    // New methods for Cluster Overview
+    // ========================================
+
+    /// Get list of databases
+    #[allow(dead_code)]
+    pub async fn get_databases(&self) -> ApiResult<Vec<Database>> {
+        let url = format!("{}/api/show_proc?path=/dbs", self.get_base_url());
+        tracing::debug!("Fetching databases from: {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .basic_auth(&self.cluster.username, Some(&self.cluster.password_encrypted))
+            .send()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch databases: {}", e);
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            tracing::error!("Databases API returned error status: {}", response.status());
+            return Err(ApiError::cluster_connection_failed(format!(
+                "HTTP status: {}",
+                response.status()
+            )));
+        }
+
+        let data: Value = response.json().await.map_err(|e| {
+            tracing::error!("Failed to parse databases response: {}", e);
+            ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
+        })?;
+
+        let databases = Self::parse_proc_result::<Database>(&data)?;
+        tracing::debug!("Retrieved {} databases", databases.len());
+        Ok(databases)
+    }
+
+    /// Get list of tables in a database
+    #[allow(dead_code)]
+    pub async fn get_tables(&self, database: &str) -> ApiResult<Vec<Table>> {
+        let url = format!(
+            "{}/api/show_proc?path=/dbs/{}/tables",
+            self.get_base_url(),
+            urlencoding::encode(database)
+        );
+        tracing::debug!("Fetching tables from database '{}': {}", database, url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .basic_auth(&self.cluster.username, Some(&self.cluster.password_encrypted))
+            .send()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch tables: {}", e);
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            tracing::error!("Tables API returned error status: {}", response.status());
+            return Err(ApiError::cluster_connection_failed(format!(
+                "HTTP status: {}",
+                response.status()
+            )));
+        }
+
+        let data: Value = response.json().await.map_err(|e| {
+            tracing::error!("Failed to parse tables response: {}", e);
+            ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
+        })?;
+
+        let tables = Self::parse_proc_result::<Table>(&data)?;
+        tracing::debug!("Retrieved {} tables from database '{}'", tables.len(), database);
+        Ok(tables)
+    }
+
+    /// Get schema changes status
+    #[allow(dead_code)]
+    pub async fn get_schema_changes(&self) -> ApiResult<Vec<SchemaChange>> {
+        let url = format!("{}/api/show_proc?path=/jobs", self.get_base_url());
+        tracing::debug!("Fetching schema changes from: {}", url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .basic_auth(&self.cluster.username, Some(&self.cluster.password_encrypted))
+            .send()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch schema changes: {}", e);
+                ApiError::cluster_connection_failed(format!("Request failed: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            tracing::error!("Schema changes API returned error status: {}", response.status());
+            return Err(ApiError::cluster_connection_failed(format!(
+                "HTTP status: {}",
+                response.status()
+            )));
+        }
+
+        let data: Value = response.json().await.map_err(|e| {
+            tracing::error!("Failed to parse schema changes response: {}", e);
+            ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
+        })?;
+
+        let changes = Self::parse_proc_result::<SchemaChange>(&data)?;
+        tracing::debug!("Retrieved {} schema changes", changes.len());
+        Ok(changes)
+    }
+
+    /// Get active users from current queries
+    #[allow(dead_code)]
+    pub async fn get_active_users(&self) -> ApiResult<Vec<String>> {
+        let queries = self.get_queries().await?;
+
+        // Extract unique users
+        let mut users: Vec<String> = queries
+            .iter()
+            .map(|q| q.user.clone())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        users.sort();
+        tracing::debug!("Retrieved {} active users", users.len());
+        Ok(users)
+    }
+
+    /// Get database count
+    #[allow(dead_code)]
+    pub async fn get_database_count(&self) -> ApiResult<usize> {
+        let databases = self.get_databases().await?;
+        Ok(databases.len())
+    }
+
+    /// Get total table count across all databases
+    #[allow(dead_code)]
+    pub async fn get_total_table_count(&self) -> ApiResult<usize> {
+        let databases = self.get_databases().await?;
+        let mut total_tables = 0;
+
+        for db in databases {
+            match self.get_tables(&db.database).await {
+                Ok(tables) => total_tables += tables.len(),
+                Err(e) => {
+                    tracing::warn!("Failed to get tables for database '{}': {}", db.database, e);
+                    // Continue with other databases
+                },
+            }
+        }
+
+        tracing::debug!("Total table count: {}", total_tables);
+        Ok(total_tables)
+    }
+}

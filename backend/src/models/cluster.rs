@@ -18,6 +18,7 @@ pub struct Cluster {
     pub connection_timeout: i32,
     pub tags: Option<String>,
     pub catalog: String,
+    pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub created_by: Option<i64>,
@@ -71,6 +72,7 @@ pub struct ClusterResponse {
     pub connection_timeout: i32,
     pub tags: Vec<String>,
     pub catalog: String,
+    pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -133,9 +135,9 @@ impl From<Cluster> for ClusterResponse {
             connection_timeout: cluster.connection_timeout,
             tags,
             catalog: cluster.catalog,
+            is_active: cluster.is_active,
             created_at: cluster.created_at,
             updated_at: cluster.updated_at,
         }
     }
 }
-

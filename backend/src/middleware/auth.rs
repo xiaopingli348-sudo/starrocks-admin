@@ -21,9 +21,9 @@ pub async fn auth_middleware(
 ) -> Result<Response, ApiError> {
     let uri = req.uri().to_string();
     let method = req.method().to_string();
-    
+
     tracing::debug!("Auth middleware processing: {} {}", method, uri);
-    
+
     // Get Authorization header
     let auth_header = req
         .headers()
@@ -45,15 +45,19 @@ pub async fn auth_middleware(
 
     tracing::debug!("Verifying JWT token for {} {}", method, uri);
     // Verify token
-    let claims = state.jwt_util.verify_token(token)
-        .map_err(|e| {
-            tracing::warn!("JWT token verification failed for {} {}: {:?}", method, uri, e);
-            e
-        })?;
+    let claims = state.jwt_util.verify_token(token).map_err(|e| {
+        tracing::warn!("JWT token verification failed for {} {}: {:?}", method, uri, e);
+        e
+    })?;
 
     let user_id = claims.sub.parse::<i64>().unwrap_or(0);
-    tracing::debug!("JWT token verified for user {} (ID: {}) on {} {}", 
-                   claims.username, user_id, method, uri);
+    tracing::debug!(
+        "JWT token verified for user {} (ID: {}) on {} {}",
+        claims.username,
+        user_id,
+        method,
+        uri
+    );
 
     // Add user ID to request extensions
     req.extensions_mut().insert(user_id);
@@ -72,4 +76,3 @@ pub fn get_user_id_from_request(req: &Request) -> Option<i64> {
 pub fn get_username_from_request(req: &Request) -> Option<String> {
     req.extensions().get::<String>().cloned()
 }
-

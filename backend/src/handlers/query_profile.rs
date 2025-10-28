@@ -1,21 +1,20 @@
 use axum::{
+    Json,
     extract::{Path, State},
     response::IntoResponse,
-    Json,
 };
 use std::sync::Arc;
 
 use crate::{
-    services::{cluster_service::ClusterService, starrocks_client::StarRocksClient},
+    services::starrocks_client::StarRocksClient,
     utils::error::{ApiError, ApiResult},
 };
 
 /// Get query profile for a specific query
 #[utoipa::path(
     get,
-    path = "/api/clusters/{cluster_id}/queries/{query_id}/profile",
+    path = "/api/clusters/queries/{query_id}/profile",
     params(
-        ("cluster_id" = i64, Path, description = "Cluster ID"),
         ("query_id" = String, Path, description = "Query ID")
     ),
     responses(
@@ -29,11 +28,10 @@ use crate::{
 )]
 pub async fn get_query_profile(
     State(state): State<Arc<crate::AppState>>,
-    Path((cluster_id, query_id)): Path<(i64, String)>,
+    Path(query_id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
     // Get cluster info
-    let cluster_service = ClusterService::new(state.db.clone());
-    let cluster = cluster_service.get_cluster(cluster_id).await?;
+    let cluster = state.cluster_service.get_active_cluster().await?;
 
     // Create StarRocks client
     let client = StarRocksClient::new(cluster);
@@ -48,13 +46,16 @@ pub async fn get_query_profile(
             let basic_profile = QueryProfile {
                 query_id: query_id.clone(),
                 sql: "N/A".to_string(),
-                profile_content: format!("Query profile for {} not found in StarRocks profile manager", query_id),
+                profile_content: format!(
+                    "Query profile for {} not found in StarRocks profile manager",
+                    query_id
+                ),
                 execution_time_ms: 0,
                 status: "Not Found".to_string(),
                 fragments: vec![],
             };
             Ok(Json(basic_profile))
-        }
+        },
     }
 }
 
@@ -64,7 +65,7 @@ async fn get_profile_from_starrocks(
 ) -> ApiResult<QueryProfile> {
     // Try to get profile using HTTP REST API
     let url = format!("{}/api/show_proc?path=/query_profile/{}", client.get_base_url(), query_id);
-    
+
     let response = client
         .http_client
         .get(&url)
@@ -110,7 +111,6 @@ async fn get_profile_from_starrocks(
         fragments,
     })
 }
-
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct QueryProfile {

@@ -1,15 +1,15 @@
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 
-use crate::utils::error::{ApiError, ErrorCode};
+use crate::utils::error::ApiError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,        // User ID
-    pub username: String,   // Username
-    pub exp: i64,           // Expiration time
-    pub iat: i64,           // Issued at
+    pub sub: String,      // User ID
+    pub username: String, // Username
+    pub exp: i64,         // Expiration time
+    pub iat: i64,         // Issued at
 }
 
 #[derive(Clone)]
@@ -61,7 +61,7 @@ impl JwtUtil {
             .map(|data| data.claims)
             .map_err(|e| {
                 tracing::warn!("Token verification failed: {}", e);
-                ApiError::new(ErrorCode::TokenExpired, "Invalid or expired token")
+                ApiError::TokenExpired
             })
     }
 }
@@ -87,4 +87,3 @@ mod tests {
         assert_eq!(JwtUtil::parse_expiration("invalid"), 24);
     }
 }
-

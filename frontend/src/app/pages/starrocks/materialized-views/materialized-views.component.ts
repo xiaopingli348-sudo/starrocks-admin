@@ -291,7 +291,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
   loadMaterializedViews() {
     this.loading = true;
     this.mvService
-      .getMaterializedViews(this.clusterId)
+      .getMaterializedViews()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (data) => {
@@ -481,7 +481,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
 
     this.creating = true;
     this.mvService
-      .createMaterializedView(this.clusterId, { sql: this.createSQL })
+      .createMaterializedView( { sql: this.createSQL })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -505,7 +505,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
     
     // Load DDL
     this.mvService
-      .getMaterializedViewDDL(this.clusterId, mv.name)
+      .getMaterializedViewDDL( mv.name)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (result) => {
@@ -554,7 +554,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
 
     this.refreshing = true;
     this.mvService
-      .refreshMaterializedView(this.clusterId, this.selectedMV.name, {
+      .refreshMaterializedView( this.selectedMV.name, {
         mode: this.refreshMode,
         force: this.refreshForce,
         partition_start: this.refreshPartitionStart || undefined,
@@ -588,7 +588,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
       .subscribe((confirmed) => {
         if (confirmed) {
           this.mvService
-            .cancelRefreshMaterializedView(this.clusterId, mv.name, false)
+            .cancelRefreshMaterializedView( mv.name, false)
             .pipe(takeUntil(this.destroy$))
             .subscribe({
               next: () => {
@@ -617,7 +617,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
       .subscribe((confirmed) => {
         if (confirmed) {
           this.mvService
-            .deleteMaterializedView(this.clusterId, mv.name, true)
+            .deleteMaterializedView( mv.name, true)
             .pipe(takeUntil(this.destroy$))
             .subscribe({
               next: () => {
@@ -650,7 +650,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
       .subscribe((confirmed) => {
         if (confirmed) {
           this.mvService
-            .alterMaterializedView(this.clusterId, mv.name, { alter_clause: newState })
+            .alterMaterializedView( mv.name, { alter_clause: newState })
             .pipe(takeUntil(this.destroy$))
             .subscribe({
               next: () => {
@@ -747,7 +747,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
 
     this.editing = true;
     this.mvService
-      .alterMaterializedView(this.clusterId, this.selectedMV.name, { alter_clause: alterClause })
+      .alterMaterializedView( this.selectedMV.name, { alter_clause: alterClause })
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {

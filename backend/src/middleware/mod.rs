@@ -1,4 +1,3 @@
 pub mod auth;
 
-pub use auth::{auth_middleware, AuthState};
-
+pub use auth::{AuthState, auth_middleware};

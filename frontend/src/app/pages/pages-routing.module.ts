@@ -9,7 +9,7 @@ const routes: Routes = [{
   children: [
     {
       path: 'starrocks',
-      loadChildren: () => import('./starrocks/starrocks.module')
+      loadChildren: () => import(/* webpackChunkName: "starrocks" */ './starrocks/starrocks.module')
         .then(m => m.StarRocksModule),
     },
     {

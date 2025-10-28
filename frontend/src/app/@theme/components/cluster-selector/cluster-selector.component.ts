@@ -48,24 +48,11 @@ export class ClusterSelectorComponent implements OnInit, OnDestroy {
         this.clusters = clusters;
         this.loading = false;
 
-        // Auto-select cluster if none is active
+        // The active cluster status comes from backend via the is_active field
+        // Just need to refresh if no active cluster is shown
         if (clusters.length > 0 && !this.activeCluster) {
-          const savedId = this.clusterContext.getSavedClusterId();
-          let clusterToSelect: any = null;
-          
-          if (savedId) {
-            // Try to restore saved cluster
-            clusterToSelect = clusters.find(c => c.id === savedId);
-          }
-          
-          // If only one cluster exists, auto-select it
-          if (!clusterToSelect && clusters.length === 1) {
-            clusterToSelect = clusters[0];
-          }
-          
-          if (clusterToSelect) {
-            this.selectCluster(clusterToSelect);
-          }
+          // Refresh active cluster from backend
+          this.clusterContext.refreshActiveCluster();
         }
       },
       error: (error) => {

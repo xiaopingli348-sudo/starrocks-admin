@@ -116,7 +116,7 @@ export class BackendsComponent implements OnInit, OnDestroy {
     this.confirmDialogService.confirmDelete(itemName, additionalWarning)
       .subscribe(confirmed => {
         if (confirmed) {
-          this.nodeService.deleteBackend(this.clusterId, backend.IP, backend.HeartbeatPort)
+          this.nodeService.deleteBackend(backend.IP, backend.HeartbeatPort)
             .subscribe({
               next: () => {
                 this.toastrService.success(
@@ -156,7 +156,6 @@ export class BackendsComponent implements OnInit, OnDestroy {
         if (cluster) {
           const newClusterId = cluster.id;
           if (this.clusterId !== newClusterId) {
-            console.log('[Backends] Active cluster changed, switching from', this.clusterId, 'to', newClusterId);
             this.clusterId = newClusterId;
             this.loadClusterInfo();
             this.loadBackends();
@@ -177,7 +176,7 @@ export class BackendsComponent implements OnInit, OnDestroy {
     interval(10000)
       .pipe(
         takeUntil(this.destroy$),
-        switchMap(() => this.nodeService.listBackends(this.clusterId)),
+        switchMap(() => this.nodeService.listBackends()),
       )
       .subscribe({
         next: (backends) => {
@@ -207,7 +206,7 @@ export class BackendsComponent implements OnInit, OnDestroy {
 
   loadBackends(): void {
     this.loading = true;
-    this.nodeService.listBackends(this.clusterId).subscribe({
+    this.nodeService.listBackends().subscribe({
       next: (backends) => {
         this.source.load(backends);
         this.loading = false;

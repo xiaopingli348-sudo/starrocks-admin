@@ -8,7 +8,7 @@ import { BackendsComponent } from './backends/backends.component';
 import { FrontendsComponent } from './frontends/frontends.component';
 import { MaterializedViewsComponent } from './materialized-views/materialized-views.component';
 import { QueriesComponent } from './queries/queries.component';
-import { MonitorComponent } from './monitor/monitor.component';
+import { ClusterOverviewComponent } from './cluster-overview/cluster-overview.component';
 import { SessionsComponent } from './sessions/sessions.component';
 import { VariablesComponent } from './variables/variables.component';
 import { SystemManagementComponent } from './system-management/system-management.component';
@@ -73,8 +73,8 @@ const routes: Routes = [
     component: SystemManagementComponent,
   },
   {
-    path: 'monitor',
-    component: MonitorComponent,
+    path: 'overview',
+    component: ClusterOverviewComponent,
   },
 ];
 

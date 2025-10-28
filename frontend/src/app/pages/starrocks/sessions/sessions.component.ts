@@ -110,19 +110,16 @@ export class SessionsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    console.log('[Sessions] ngOnInit - Initial clusterId:', this.clusterId);
     
     // Subscribe to active cluster changes
     this.clusterContext.activeCluster$
       .pipe(takeUntil(this.destroy$))
       .subscribe(cluster => {
-        console.log('[Sessions] Active cluster changed:', cluster);
         this.activeCluster = cluster;
         if (cluster) {
           // Always use the active cluster (override route parameter)
           const newClusterId = cluster.id;
           if (this.clusterId !== newClusterId) {
-            console.log('[Sessions] Switching cluster from', this.clusterId, 'to', newClusterId);
             this.clusterId = newClusterId;
             this.loadSessions();
           }
@@ -131,13 +128,11 @@ export class SessionsComponent implements OnInit, OnDestroy {
 
     // Load sessions if clusterId is already set
     if (this.clusterId && this.clusterId > 0) {
-      console.log('[Sessions] Loading with route clusterId:', this.clusterId);
       this.loadSessions();
       if (this.autoRefresh) {
         this.startAutoRefresh();
       }
     } else if (!this.clusterContext.hasActiveCluster()) {
-      console.log('[Sessions] No active cluster found');
       this.toastrService.warning('请先在集群概览页面激活一个集群', '提示');
     }
   }
@@ -150,16 +145,13 @@ export class SessionsComponent implements OnInit, OnDestroy {
 
   loadSessions(): void {
     if (!this.clusterId || this.clusterId === 0) {
-      console.log('[Sessions] No valid clusterId, skipping load');
       this.loading = false;
       return;
     }
 
-    console.log('[Sessions] Loading sessions for cluster:', this.clusterId);
     this.loading = true;
-    this.nodeService.getSessions(this.clusterId).subscribe({
+    this.nodeService.getSessions().subscribe({
       next: (sessions) => {
-        console.log('[Sessions] Loaded sessions:', sessions.length);
         this.sessions = sessions;
         this.source.load(sessions);
         this.loading = false;
@@ -184,7 +176,7 @@ export class SessionsComponent implements OnInit, OnDestroy {
   killSession(session: Session): void {
     if (confirm(`确定要终止会话 ${session.id} 吗？`)) {
       this.loading = true;
-      this.nodeService.killSession(this.clusterId, session.id).subscribe({
+      this.nodeService.killSession(session.id).subscribe({
         next: () => {
           this.toastrService.success(`会话 ${session.id} 已成功终止`, '成功');
           this.loadSessions();
