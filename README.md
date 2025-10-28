@@ -1,4 +1,4 @@
-# StarRocks Admin
+# StarRocks Admin {#english}
 
 <div align="center">
 
