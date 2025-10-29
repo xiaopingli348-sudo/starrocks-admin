@@ -38,6 +38,10 @@ mkdir -p "$DIST_DIR/migrations"
 # Build backend
 echo -e "${YELLOW}[1/4]${NC} Compiling Rust backend (release mode)..."
 cd "$BACKEND_DIR"
+# Ensure Rust environment is loaded
+if [ -f "$HOME/.cargo/env" ]; then
+    source "$HOME/.cargo/env"
+fi
 cargo build --release
 
 # Copy binary
