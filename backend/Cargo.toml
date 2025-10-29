@@ -33,7 +33,7 @@ bcrypt = "0.15"
 reqwest = { version = "0.12", features = ["json"] }
 
 # Security fixes - force update vulnerable dependencies
-idna = "0.5.1"
+idna = "0.5"
 rsa = "0.9.9"
 
 # Configuration
