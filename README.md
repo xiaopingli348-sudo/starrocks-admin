@@ -385,6 +385,69 @@ make dev
 - [Axum](https://github.com/tokio-rs/axum) - 强大的 Rust Web 框架
 - [StarRocks](https://www.starrocks.io/) - 高性能分析数据库
 
+## 修改记录
+
+### 2025-01-25: 优化构建系统和修复代码质量问题
+
+#### 会话主要目的
+- 修复 cargo 文件锁检测逻辑问题
+- 优化构建系统代码结构
+- 修复业务代码质量问题
+- 分批提交构建代码和业务代码
+
+#### 完成的主要任务
+1. **修复 cargo 进程检测逻辑**
+   - 移除了不准确的 `pgrep` 进程检测
+   - 改为直接编译 + 超时保护机制
+   - 让 cargo 自动处理文件锁等待
+
+2. **代码质量检查与修复**
+   - 修复 Rust Clippy 警告（collapsible if, needless borrow, get(0)）
+   - 修复 Angular Lint 警告（OnInit 接口实现）
+   - 优化 Rust 代码格式
+
+3. **分批代码提交**
+   - 第一批：构建系统代码（Makefile、脚本、配置文件等）
+   - 第二批：业务代码（backend/src、frontend/src）
+
+#### 关键决策和解决方案
+- **文件锁处理**：信任 cargo 内置的文件锁机制，不再手动检测进程，避免误判
+- **超时保护**：添加 5 分钟编译超时保护，防止无限等待
+- **代码分离提交**：将构建代码和业务代码分开提交，便于代码审查和维护
+
+#### 使用的技术栈
+- Rust: cargo build, cargo watch, cargo clippy, cargo fmt
+- Angular: ng lint, prettier
+- Git: 分批提交策略
+
+#### 修改的文件
+
+**构建系统文件（第一批提交）：**
+- `Makefile` - 优化构建命令复用
+- `.gitignore` - 更新忽略规则
+- `backend/.cargo/config.toml` - Cargo 配置优化
+- `scripts/dev/start_backend.sh` - 修复文件锁检测逻辑
+- `scripts/dev/check_status.sh` - 服务状态检测脚本
+- `scripts/dev/common.sh` - WSL 环境检测公共函数
+- `scripts/dev/start_separate_terminals.sh` - 分离终端启动脚本
+- `scripts/dev/stop.sh` - 服务停止脚本优化
+- `scripts/dev/incremental_build.sh` - 增量构建脚本
+- `scripts/dev/install_nodejs.sh` - Node.js 安装脚本
+- `scripts/config/generate-frontend-environments.js` - 前端环境配置生成
+- `scripts/quality-check.sh` - 代码质量检查脚本
+- `dev-doc/开发环境优化说明.md` - 开发环境优化文档
+- `dev-doc/热重载优化说明.md` - 热重载优化文档
+- `README.md` - 更新文档说明
+
+**业务代码文件（第二批提交）：**
+- `backend/src/config.rs` - 修复 Clippy 警告
+- `backend/src/handlers/overview.rs` - 代码优化
+- `backend/src/services/mod.rs` - 代码优化
+- `backend/src/services/overview_service.rs` - 修复 Clippy 警告和代码格式
+- `frontend/src/app/pages/starrocks/cluster-overview/metric-card-group/metric-card-group.component.ts` - 修复 Angular Lint 警告
+- `frontend/src/environments/environment.ts` - 环境配置更新
+- `frontend/src/environments/environment.prod.ts` - 生产环境配置更新
+
 ## 捐赠支持
 
 <div align="center">
