@@ -18,7 +18,7 @@ help:
 	@echo "  make build-clean  - 清理缓存后构建"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev          - 启动开发环境（前后端热加载）"
+	@echo "  make dev          - 启动开发环境（前后端分离终端窗口，方便查看日志）"
 	@echo "  make dev-start    - 启动开发服务器（后台）"
 	@echo "  make dev-stop     - 停止开发服务器"
 	@echo "  make dev-restart  - 重启开发服务器"
@@ -61,42 +61,40 @@ docker-down:
 	@echo "Stopping Docker container..."
 	@cd deploy/docker && docker compose down
 
-# Clean build artifacts
-clean:
-	@echo "Cleaning build artifacts..."
+# Clean build artifacts (完全清理，包括 build 目录)
+# 复用 build-clean 的逻辑，然后额外清理 build 目录
+clean: build-clean
+	@echo "Cleaning build directory..."
 	@rm -rf $(BUILD_DIR)
-	@cd $(BACKEND_DIR) && cargo clean
-	@cd $(FRONTEND_DIR) && rm -rf dist node_modules/.cache
 	@echo "Clean complete!"
 
 # ==================== Development Commands ====================
 
-# 开发环境 - 热加载模式（前台运行，Ctrl+C 停止）
+# 开发环境 - 分离终端窗口（前后端在不同窗口，方便查看日志）
 dev:
-	@echo "Starting development environment with hot reload..."
-	@bash scripts/dev/start.sh
+	@echo "Starting development environment in separate terminal windows..."
+	@bash scripts/dev/start_separate_terminals.sh
 
-# 启动开发服务器（后台运行）
+# dev-separate 是 dev 的别名（保持向后兼容）
+dev-separate: dev
+
+# 启动开发服务器（分离终端窗口，后台模式）
 dev-start:
-	@bash scripts/dev/start.sh start
+	@bash scripts/dev/start_separate_terminals.sh start
 
 # 停止开发服务器
 dev-stop:
 	@bash scripts/dev/stop.sh
 
-# 重启开发服务器
+# 重启开发服务器（复用 dev-stop 和 dev-start）
 dev-restart:
-	@bash scripts/dev/stop.sh
+	@$(MAKE) dev-stop
 	@sleep 2
-	@bash scripts/dev/start.sh start
+	@$(MAKE) dev-start
 
-# 查看服务状态
+# 查看服务状态（智能检测，支持所有启动方式）
 dev-status:
-	@echo "=== Backend Status ==="
-	@bash scripts/dev/start_backend.sh status || true
-	@echo ""
-	@echo "=== Frontend Status ==="
-	@bash scripts/dev/start_frontend.sh status || true
+	@bash scripts/dev/check_status.sh all || true
 
 # 查看实时日志
 dev-logs:

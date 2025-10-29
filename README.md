@@ -132,7 +132,7 @@ web_root = "web"
 For rapid development iteration, the project supports hot reload:
 
 ```bash
-# Start development environment with hot reload (recommended)
+# Development environment with separate terminal windows
 make dev
 
 # Or start in background mode
@@ -153,10 +153,12 @@ make dev-restart
 
 ### Development Features
 
+- **Optimized Build**: Incremental compilation with dependency caching
 - **Hot Reload**: Code changes automatically reload without manual restart
 - **Backend**: Uses `cargo-watch` for automatic Rust code recompilation
 - **Frontend**: Angular development server with built-in hot reload
 - **Fast Iteration**: Modify code → Save → Instant preview
+- **Smart Caching**: Third-party libraries are pre-compiled and cached
 
 ### Quick Commands
 
@@ -322,7 +324,7 @@ web_root = "web"
 为了支持快速开发迭代，项目支持热重载：
 
 ```bash
-# 启动开发环境（热重载模式，推荐）
+# 启动开发环境（前后端分离终端窗口）
 make dev
 
 # 或以后台模式启动
@@ -343,15 +345,17 @@ make dev-restart
 
 ### 开发特性
 
+- **优化构建**：增量编译与依赖缓存，大幅提升编译速度
 - **热重载**：代码修改自动重新加载，无需手动重启
 - **后端**：使用 `cargo-watch` 实现 Rust 代码自动重新编译
 - **前端**：Angular 开发服务器自带热重载
 - **快速迭代**：修改代码 → 保存 → 即时预览
+- **智能缓存**：第三方库预编译缓存，避免重复编译
 
 ### 快速命令
 
 ```bash
-# 一个命令启动所有服务（热重载）
+# 一个命令启动所有服务（前后端分离终端窗口，方便查看日志）
 make dev
 
 # 开发环境将运行在：

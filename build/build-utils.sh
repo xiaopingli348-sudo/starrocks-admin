@@ -151,6 +151,9 @@ clean_build_cache() {
         rm -rf "$frontend_dir/dist"
         echo -e "${GREEN}✓${NC} 清理前端 dist 目录"
     fi
+    
+    # 清理 build 目录（可选，用于 make clean）
+    # 注意：build-clean 不清理 build 目录，只清理编译缓存
 }
 
 # 显示构建摘要
