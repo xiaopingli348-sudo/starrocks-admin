@@ -1,0 +1,143 @@
+@import '../../styles/themes';
+
+@include nb-install-component() {
+  // Nebular-style glow animation for active tab
+  // Using subtle semi-transparent blue matching primary color across themes
+  @keyframes tab-glow-pulse {
+    0%, 100% {
+      box-shadow: 
+        0 0 8px rgba(51, 102, 255, 0.25),
+        0 0 16px rgba(51, 102, 255, 0.12),
+        inset 0 0 12px rgba(51, 102, 255, 0.06);
+    }
+    50% {
+      box-shadow: 
+        0 0 12px rgba(51, 102, 255, 0.35),
+        0 0 24px rgba(51, 102, 255, 0.18),
+        inset 0 0 16px rgba(51, 102, 255, 0.1);
+    }
+  }
+
+  .tab-bar {
+    background-color: nb-theme(background-basic-color-1);
+    border-bottom: 1px solid nb-theme(border-basic-color-3);
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-bottom: 0; // 确保没有额外的margin
+    margin-left: 0; // 确保Tab栏与内容区域左对齐
+
+    .tab-container {
+      display: flex;
+      height: 100%;
+      min-width: 100%;
+      margin-left: 0; // 确保Tab容器没有左边距
+
+      .tab-item {
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        height: 100%;
+        min-width: 120px;
+        max-width: 200px;
+        cursor: pointer;
+        border-right: 1px solid nb-theme(border-basic-color-3);
+        background-color: nb-theme(background-basic-color-2);
+        transition: all 0.3s ease;
+        position: relative;
+        user-select: none;
+
+        &:hover {
+          background-color: nb-theme(background-basic-color-3);
+        }
+
+        &.active {
+          background-color: nb-theme(background-basic-color-1);
+          color: nb-theme(color-primary-default);
+          font-weight: 500;
+          
+          // Nebular-style glow effect with subtle pulsing animation
+          animation: tab-glow-pulse 2s ease-in-out infinite;
+        }
+
+        &.pinned {
+          background-color: nb-theme(background-basic-color-1);
+          border-left: 3px solid nb-theme(color-success-default);
+          margin-left: 0; // 确保固定Tab没有额外的左边距
+        }
+
+        .pin-icon {
+          font-size: 12px;
+          color: nb-theme(color-success-default);
+          margin-right: 4px;
+          flex-shrink: 0;
+        }
+
+        .tab-title {
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 13px;
+          line-height: 1;
+        }
+
+        .close-icon {
+          font-size: 12px;
+          color: nb-theme(text-hint-color);
+          margin-left: 6px;
+          padding: 2px;
+          border-radius: 2px;
+          flex-shrink: 0;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background-color: nb-theme(color-danger-default);
+            color: nb-theme(text-control-color);
+          }
+        }
+      }
+    }
+  }
+
+  // 响应式设计
+  @media (max-width: 768px) {
+    .tab-bar {
+      .tab-container {
+        .tab-item {
+          min-width: 100px;
+          max-width: 150px;
+          padding: 0 8px;
+
+          .tab-title {
+            font-size: 12px;
+          }
+        }
+      }
+    }
+  }
+
+  @media (max-width: 576px) {
+    .tab-bar {
+      .tab-container {
+        .tab-item {
+          min-width: 80px;
+          max-width: 120px;
+          padding: 0 6px;
+
+          .tab-title {
+            font-size: 11px;
+          }
+
+          .pin-icon,
+          .close-icon {
+            font-size: 10px;
+          }
+        }
+      }
+    }
+  }
+}

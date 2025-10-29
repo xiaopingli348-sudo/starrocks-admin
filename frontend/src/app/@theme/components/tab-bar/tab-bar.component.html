@@ -1,0 +1,29 @@
+<div class="tab-bar">
+  <div class="tab-container">
+    <div 
+      *ngFor="let tab of tabs; trackBy: trackByTabId"
+      class="tab-item"
+      [class.active]="tab.active"
+      [class.pinned]="tab.pinned"
+      (click)="onTabClick(tab)">
+      
+      <!-- 固定图标 -->
+      <nb-icon 
+        *ngIf="tab.pinned" 
+        icon="pin-outline" 
+        class="pin-icon">
+      </nb-icon>
+      
+      <!-- Tab标题 -->
+      <span class="tab-title">{{ tab.title }}</span>
+      
+      <!-- 关闭按钮 -->
+      <nb-icon 
+        *ngIf="tab.closable" 
+        icon="close-outline" 
+        class="close-icon"
+        (click)="onCloseTab($event, tab.id)">
+      </nb-icon>
+    </div>
+  </div>
+</div>

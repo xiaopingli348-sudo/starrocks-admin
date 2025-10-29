@@ -14,6 +14,7 @@ import { Component } from '@angular/core';
       </nb-sidebar>
 
       <nb-layout-column>
+        <ngx-tab-bar></ngx-tab-bar>
         <ng-content select="router-outlet"></ng-content>
       </nb-layout-column>
     </nb-layout>

@@ -311,7 +311,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
   extractDatabases() {
     const dbSet = new Set<string>();
     this.allMaterializedViews.forEach((mv) => {
-      if (mv.database_name) {
+      if (mv && mv.database_name) {
         dbSet.add(mv.database_name);
       }
     });
@@ -320,7 +320,7 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
 
   calculateStatistics() {
     this.totalCount = this.allMaterializedViews.length;
-    this.activeCount = this.allMaterializedViews.filter((mv) => mv.is_active).length;
+    this.activeCount = this.allMaterializedViews.filter((mv) => mv && mv.is_active).length;
     this.inactiveCount = this.totalCount - this.activeCount;
   }
 
@@ -332,31 +332,31 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
       const searchLower = this.searchText.toLowerCase();
       filtered = filtered.filter(
         (mv) =>
-          mv.name.toLowerCase().includes(searchLower) ||
-          mv.database_name.toLowerCase().includes(searchLower),
+          (mv.name && mv.name.toLowerCase().includes(searchLower)) ||
+          (mv.database_name && mv.database_name.toLowerCase().includes(searchLower)),
       );
     }
 
     // Database filter
     if (this.selectedDatabase !== 'all') {
-      filtered = filtered.filter((mv) => mv.database_name === this.selectedDatabase);
+      filtered = filtered.filter((mv) => mv && mv.database_name === this.selectedDatabase);
     }
 
     // Refresh type filter
     if (this.selectedRefreshType !== 'all') {
-      filtered = filtered.filter((mv) => mv.refresh_type === this.selectedRefreshType);
+      filtered = filtered.filter((mv) => mv && mv.refresh_type === this.selectedRefreshType);
     }
 
     // Active state filter
     if (this.selectedActiveState !== 'all') {
       const isActive = this.selectedActiveState === 'active';
-      filtered = filtered.filter((mv) => mv.is_active === isActive);
+      filtered = filtered.filter((mv) => mv && mv.is_active === isActive);
     }
 
     // Refresh state filter
     if (this.selectedRefreshState !== 'all') {
       filtered = filtered.filter(
-        (mv) => mv.last_refresh_state === this.selectedRefreshState,
+        (mv) => mv && mv.last_refresh_state === this.selectedRefreshState,
       );
     }
 
@@ -366,30 +366,30 @@ export class MaterializedViewsComponent implements OnInit, OnDestroy {
       if (this.refreshTimeStart) {
         filtered = filtered.filter(
           (mv) =>
-            mv.last_refresh_finished_time &&
+            mv && mv.last_refresh_finished_time &&
             mv.last_refresh_finished_time >= this.refreshTimeStart,
         );
       }
       if (this.refreshTimeEnd) {
         filtered = filtered.filter(
           (mv) =>
-            mv.last_refresh_finished_time &&
+            mv && mv.last_refresh_finished_time &&
             mv.last_refresh_finished_time <= this.refreshTimeEnd,
         );
       }
 
       // Row count filter
       if (this.rowCountMin !== null) {
-        filtered = filtered.filter((mv) => mv.rows && mv.rows >= this.rowCountMin);
+        filtered = filtered.filter((mv) => mv && mv.rows && mv.rows >= this.rowCountMin);
       }
       if (this.rowCountMax !== null) {
-        filtered = filtered.filter((mv) => mv.rows && mv.rows <= this.rowCountMax);
+        filtered = filtered.filter((mv) => mv && mv.rows && mv.rows <= this.rowCountMax);
       }
 
       // Partition type filter
       if (this.selectedPartitionType !== 'all') {
         filtered = filtered.filter(
-          (mv) => mv.partition_type === this.selectedPartitionType,
+          (mv) => mv && mv.partition_type === this.selectedPartitionType,
         );
       }
     }

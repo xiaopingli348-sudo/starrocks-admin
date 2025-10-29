@@ -25,6 +25,7 @@ import {
   TinyMCEComponent,
 } from './components';
 import { ClusterSelectorComponent } from './components/cluster-selector/cluster-selector.component';
+import { TabBarComponent } from './components/tab-bar/tab-bar.component';
 import {
   CapitalizePipe,
   PluralPipe,
@@ -64,6 +65,7 @@ const COMPONENTS = [
   SearchInputComponent,
   TinyMCEComponent,
   ClusterSelectorComponent,
+  TabBarComponent,
   OneColumnLayoutComponent,
   ThreeColumnsLayoutComponent,
   TwoColumnsLayoutComponent,

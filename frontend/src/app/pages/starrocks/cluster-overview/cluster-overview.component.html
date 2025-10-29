@@ -1,8 +1,7 @@
 <div class="cluster-overview">
   <nb-card>
     <nb-card-header>
-      <div class="d-flex justify-content-between align-items-center">
-        <h5>集群概览</h5>
+      <div class="d-flex justify-content-end align-items-center">
         <div class="d-flex align-items-center gap-2">
       <nb-select [(selected)]="timeRange" (selectedChange)="onTimeRangeChange($event)" placeholder="时间范围" size="small">
         <nb-option *ngFor="let opt of timeRangeOptions" [value]="opt.value">{{ opt.label }}</nb-option>
