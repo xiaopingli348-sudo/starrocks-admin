@@ -260,7 +260,7 @@ start_service() {
         echo "  - PID: $BACKEND_PID"
         echo "  - 健康检查: http://$HOST:$PORT/health"
         echo "  - Web UI: http://$HOST:$PORT"
-echo ""
+        echo ""
 
         # 测试健康检查
         if curl -s "http://$HOST:$PORT/health" > /dev/null 2>&1; then
