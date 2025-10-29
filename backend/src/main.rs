@@ -72,6 +72,9 @@ pub struct AppState {
         handlers::materialized_view::refresh_materialized_view,
         handlers::materialized_view::cancel_refresh_materialized_view,
         handlers::materialized_view::alter_materialized_view,
+        handlers::query::list_catalogs,
+        handlers::query::list_databases,
+        handlers::query::list_catalogs_with_databases,
         handlers::query::list_queries,
         handlers::query::kill_query,
         handlers::query::execute_sql,
@@ -119,6 +122,8 @@ pub struct AppState {
             models::Query,
             models::QueryExecuteRequest,
             models::QueryExecuteResponse,
+            models::CatalogWithDatabases,
+            models::CatalogsWithDatabasesResponse,
             models::QueryHistoryItem,
             models::QueryHistoryResponse,
             models::ProfileListItem,
@@ -309,6 +314,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Frontends
         .route("/api/clusters/frontends", get(handlers::frontend::list_frontends))
         // Queries
+        .route("/api/clusters/catalogs", get(handlers::query::list_catalogs))
+        .route("/api/clusters/databases", get(handlers::query::list_databases))
+        .route("/api/clusters/catalogs-databases", get(handlers::query::list_catalogs_with_databases))
         .route("/api/clusters/queries", get(handlers::query::list_queries))
         .route("/api/clusters/queries/execute", post(handlers::query::execute_sql))
         .route("/api/clusters/queries/:query_id", delete(handlers::query::kill_query))

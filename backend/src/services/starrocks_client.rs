@@ -363,7 +363,8 @@ impl StarRocksClient {
             all_mvs.extend(sync_mvs);
         } else {
             // Get all databases first, then query each database
-            let databases = self.get_all_databases().await?;
+            // Use default catalog (None means use cluster's default catalog)
+            let databases = self.get_all_databases(None).await?;
 
             for db in &databases {
                 // Get async MVs from this database
@@ -382,14 +383,13 @@ impl StarRocksClient {
         Ok(all_mvs)
     }
 
-    // Get all databases in the catalog
-    #[allow(dead_code)]
-    async fn get_all_databases(&self) -> ApiResult<Vec<String>> {
+    // Get all databases in the specified catalog
+    pub async fn get_all_databases(&self, catalog: Option<&str>) -> ApiResult<Vec<String>> {
         let sql = "SHOW DATABASES";
-        tracing::debug!("Fetching all databases with SQL: {}", sql);
+        tracing::debug!("Fetching databases with SQL: {}", sql);
 
-        let catalog = &self.cluster.catalog;
-        let url = format!("{}/api/v1/catalogs/{}/sql", self.get_base_url(), catalog);
+        let catalog_name = catalog.unwrap_or(&self.cluster.catalog);
+        let url = format!("{}/api/v1/catalogs/{}/sql", self.get_base_url(), catalog_name);
 
         let body = serde_json::json!({
             "query": sql
@@ -416,24 +416,38 @@ impl StarRocksClient {
             ApiError::cluster_connection_failed(format!("Failed to parse response: {}", e))
         })?;
 
-        // Parse SHOW DATABASES result
+        // Parse SHOW DATABASES result - try multiple formats
         let result_data = data.get("data").unwrap_or(&data);
         let mut databases = Vec::new();
 
+        // Try PROC format first: {"columnNames": [...], "rows": [[...]]}
         if let Some(rows) = result_data.get("rows").and_then(|v| v.as_array()) {
             for row in rows {
-                if let Some(row_array) = row.as_array()
-                    && let Some(db_name) = row_array.first().and_then(|v| v.as_str())
-                {
-                    // Skip system databases
-                    if db_name != "information_schema" && db_name != "_statistics_" {
-                        databases.push(db_name.to_string());
+                if let Some(row_array) = row.as_array() {
+                    // Find Database column - could be first column or by name
+                    if let Some(db_name_value) = row_array.first() {
+                        let db_name = if let Some(name_str) = db_name_value.as_str() {
+                            name_str.trim().to_string()
+                        } else {
+                            continue;
+                        };
+                        
+                        // Skip system databases and empty names
+                        if !db_name.is_empty()
+                            && db_name != "information_schema" 
+                            && db_name != "_statistics_" {
+                            databases.push(db_name);
+                        }
                     }
                 }
             }
         }
 
-        tracing::debug!("Found {} databases", databases.len());
+        tracing::debug!(
+            "Found {} databases in catalog {} (or default)", 
+            databases.len(),
+            catalog_name
+        );
         Ok(databases)
     }
 

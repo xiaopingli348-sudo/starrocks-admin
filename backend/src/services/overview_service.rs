@@ -725,7 +725,7 @@ impl OverviewService {
             GROUP BY TABLE_SCHEMA
         "#;
 
-        let (columns, rows) = mysql_client.query_raw(sql).await?;
+        let (columns, rows) = mysql_client.query_raw(sql, None, None).await?;
         let mut total_size: i64 = 0;
 
         // Find column indices
@@ -1363,7 +1363,7 @@ impl OverviewService {
             FROM information_schema.materialized_views
         "#;
 
-        let (columns, rows) = mysql_client.query_raw(query).await?;
+        let (columns, rows) = mysql_client.query_raw(query, None, None).await?;
 
         // Build column index map
         let mut col_idx = std::collections::HashMap::new();
@@ -1419,7 +1419,7 @@ impl OverviewService {
             GROUP BY State
         "#;
 
-        let (columns, rows) = mysql_client.query_raw(query).await?;
+        let (columns, rows) = mysql_client.query_raw(query, None, None).await?;
 
         // Build column index map
         let mut col_idx = std::collections::HashMap::new();
@@ -1491,7 +1491,7 @@ impl OverviewService {
             GROUP BY queryType, state
         "#;
 
-        let (columns, rows) = mysql_client.query_raw(query).await?;
+        let (columns, rows) = mysql_client.query_raw(query, None, None).await?;
 
         // Build column index map
         let mut col_idx = std::collections::HashMap::new();
@@ -1547,7 +1547,7 @@ impl OverviewService {
         // Query compaction tasks from FE
         // SHOW PROC '/compactions' shows current running compaction tasks
         let query = "SHOW PROC '/compactions'";
-        let (_headers, rows) = client.query_raw(query).await.unwrap_or((vec![], vec![]));
+        let (_headers, rows) = client.query_raw(query, None, None).await.unwrap_or((vec![], vec![]));
 
         // Count running compaction tasks
         // Note: In StarRocks shared-data mode, there are no separate
@@ -1621,7 +1621,7 @@ impl OverviewService {
         "#;
 
         let (_headers, rows) = client
-            .query_raw(top_partitions_query)
+            .query_raw(top_partitions_query, None, None)
             .await
             .unwrap_or((vec![], vec![]));
 
@@ -1648,7 +1648,7 @@ impl OverviewService {
         let task_stats_query = r#"SHOW PROC '/compactions'"#;
 
         let (_headers, rows) = client
-            .query_raw(&task_stats_query)
+            .query_raw(&task_stats_query, None, None)
             .await
             .unwrap_or((vec![], vec![]));
 
@@ -1757,7 +1757,7 @@ impl OverviewService {
 
         // Query SHOW PROCESSLIST to get current connections
         let query = "SHOW FULL PROCESSLIST";
-        let (_headers, rows) = client.query_raw(query).await?;
+        let (_headers, rows) = client.query_raw(query, None, None).await?;
 
         let current_connections = rows.len() as i32;
 
@@ -1895,7 +1895,7 @@ impl OverviewService {
 
         // Query StarRocks version using SELECT VERSION()
         let sql = "SELECT VERSION() as version";
-        let (columns, rows) = mysql_client.query_raw(sql).await?;
+        let (columns, rows) = mysql_client.query_raw(sql, None, None).await?;
 
         // Find the version column index
         if let Some(version_idx) = columns

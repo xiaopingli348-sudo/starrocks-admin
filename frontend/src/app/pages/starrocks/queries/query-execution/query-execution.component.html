@@ -1,70 +1,51 @@
 <div class="row">
   <div class="col-12">
     <nb-card>
-      <nb-card-header>
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="d-flex align-items-center gap-2">
-            <h5 class="mb-0">实时查询</h5>
-            <span class="text-hint">|</span>
-            <span class="text-hint" style="font-size: 13px;">
-              集群: <strong>{{ activeCluster?.name || '未选择集群' }}</strong>
-            </span>
-          </div>
-          <div class="d-flex align-items-center gap-2">
-            <button nbButton status="primary" size="small" (click)="loadCurrentTab()" [disabled]="loading || !clusterId">
-              <nb-icon icon="refresh-outline"></nb-icon>
-              刷新
-            </button>
-            
-            <nb-select 
-              [(selected)]="selectedRefreshInterval" 
-              size="small" 
-              placeholder="间隔"
-              (selectedChange)="onRefreshIntervalChange($event)"
-              [disabled]="!clusterId"
-              style="min-width: 90px;"
-            >
-              <nb-option *ngFor="let option of refreshIntervalOptions" [value]="option.value">
-                {{ option.label }}
-              </nb-option>
-            </nb-select>
-            
-            <button 
-              nbButton 
-              [status]="autoRefresh ? 'success' : 'basic'" 
-              size="small" 
-              (click)="toggleAutoRefresh()"
-              [disabled]="!clusterId"
-            >
-              <nb-icon [icon]="autoRefresh ? 'checkmark-circle-2-outline' : 'pause-circle-outline'"></nb-icon>
-              {{ autoRefresh ? '停止' : '自动' }}
-            </button>
-          </div>
-        </div>
-      </nb-card-header>
       <nb-card-body>
         <!-- Tab Selector -->
         <nb-tabset (changeTab)="selectTab($event.tabId)">
           <!-- Real-time Query Tab -->
           <nb-tab tabTitle="实时查询" tabId="realtime" [active]="selectedTab === 'realtime'">
             <div class="realtime-query-container">
-              <!-- SQL Editor - Simplified -->
+              <!-- SQL Editor - CodeMirror -->
               <div class="sql-editor-section">
-                <textarea 
-                  nbInput 
-                  fullWidth 
-                  rows="8"
-                  class="sql-editor"
-                  placeholder="输入 SQL 语句并执行... 例如: SELECT * FROM information_schema.tables"
-                  [(ngModel)]="sqlInput"
-                  [disabled]="executing">
-                </textarea>
-                
-                <div class="editor-toolbar">
-                  <div class="left-actions">
+                <!-- Catalog and Database Selection with Action Buttons on Right -->
+                <div class="catalog-database-selector mb-1 d-flex justify-content-between align-items-center gap-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <nb-select 
+                      [(selected)]="selectedCatalog" 
+                      (selectedChange)="onCatalogChange($event)"
+                      placeholder="选择 Catalog"
+                      size="small"
+                      [disabled]="executing || loadingCatalogs"
+                      style="min-width: 180px;">
+                      <nb-option *ngFor="let catalog of catalogs" [value]="catalog">
+                        {{ catalog }}
+                      </nb-option>
+                    </nb-select>
+                    
+                    <nb-select 
+                      [(selected)]="selectedDatabase" 
+                      placeholder="{{ loadingDatabases ? '加载中...' : (selectedCatalog ? '选择数据库（可选）' : '请先选择 Catalog') }}"
+                      size="small"
+                      [disabled]="executing || loadingDatabases || !selectedCatalog"
+                      style="min-width: 200px;">
+                      <nb-option value="">不使用数据库</nb-option>
+                      <nb-option *ngFor="let db of databases" [value]="db">
+                        {{ db }}
+                      </nb-option>
+                      <nb-option *ngIf="!loadingDatabases && selectedCatalog && databases.length === 0" disabled>
+                        该 Catalog 下暂无数据库
+                      </nb-option>
+                    </nb-select>
+                  </div>
+                  
+                  <!-- Action Buttons on Top Right -->
+                  <div class="editor-action-buttons d-flex align-items-center gap-2">
                     <button 
                       nbButton 
                       status="primary" 
+                      size="small"
                       (click)="executeSQL()" 
                       [disabled]="executing || !clusterId || !sqlInput">
                       <nb-icon icon="play-circle-outline"></nb-icon>
@@ -73,6 +54,7 @@
                     <button 
                       nbButton 
                       status="basic" 
+                      size="small"
                       (click)="clearSQL()" 
                       [disabled]="executing">
                       <nb-icon icon="trash-2-outline"></nb-icon>
@@ -81,12 +63,19 @@
                     <button 
                       nbButton 
                       status="info" 
+                      size="small"
                       (click)="formatSQL()" 
                       [disabled]="executing || !sqlInput">
                       <nb-icon icon="code-outline"></nb-icon>
                       格式化
                     </button>
                   </div>
+                </div>
+
+                <!-- CodeMirror Editor Container -->
+                <div #editorContainer class="codemirror-container"></div>
+                
+                <div class="editor-toolbar mt-2 d-flex justify-content-end align-items-center">
                   <div class="right-actions">
                     <span class="limit-label">限制:</span>
                     <nb-select 
@@ -100,33 +89,36 @@
                   </div>
                 </div>
                 
-                <small class="hint-text">
+                <small class="hint-text mt-2">
                   <nb-icon icon="info-outline"></nb-icon>
                   SELECT 查询会自动添加 LIMIT 限制（如未指定）
                 </small>
               </div>
 
               <!-- Query Result -->
-              <nb-card *ngIf="queryResult">
+              <nb-card *ngIf="queryResult" class="mt-3">
                 <nb-card-header>
                   <div class="result-header">
-                    <span>查询结果</span>
+                    <h6 class="mb-0">查询结果</h6>
                     <div class="result-actions">
-                      <nb-badge status="success" class="me-2">
-                        <nb-icon icon="clock-outline"></nb-icon>
-                        {{ executionTime }}ms
-                      </nb-badge>
-                      <nb-badge status="info" class="me-2">
-                        <nb-icon icon="list-outline"></nb-icon>
-                        {{ rowCount }} 行
-                      </nb-badge>
+                      <div class="result-stat-item">
+                        <nb-icon icon="clock-outline" status="success" class="stat-icon"></nb-icon>
+                        <span class="stat-label">执行耗时:</span>
+                        <span class="stat-value stat-time">{{ executionTime }}ms</span>
+                      </div>
+                      <div class="result-stat-item">
+                        <nb-icon icon="list-outline" status="info" class="stat-icon"></nb-icon>
+                        <span class="stat-label">返回行数:</span>
+                        <span class="stat-value stat-count">{{ rowCount | number }}</span>
+                      </div>
                       <button 
                         nbButton 
-                        size="tiny" 
+                        size="small" 
                         status="success"
-                        (click)="exportResults()">
+                        (click)="exportResults()"
+                        class="ml-2">
                         <nb-icon icon="download-outline"></nb-icon>
-                        导出
+                        导出 CSV
                       </button>
                     </div>
                   </div>

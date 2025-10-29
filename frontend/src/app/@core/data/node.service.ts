@@ -125,6 +125,8 @@ export interface QueryProfile {
 export interface QueryExecuteRequest {
   sql: string;
   limit?: number;
+  catalog?: string;
+  database?: string;
 }
 
 export interface QueryExecuteResult {
@@ -215,9 +217,21 @@ export class NodeService {
     return this.api.get<QueryProfile>(`/clusters/queries/${queryId}/profile`);
   }
 
+  // Get catalogs list
+  getCatalogs(): Observable<string[]> {
+    return this.api.get<string[]>(`/clusters/catalogs`);
+  }
+
+  // Get databases list in a catalog
+  getDatabases(catalog?: string): Observable<string[]> {
+    // Always pass catalog parameter, even if empty - backend expects it
+    const params = catalog ? { catalog } : {};
+    return this.api.get<string[]>(`/clusters/databases`, params);
+  }
+
   // Execute SQL API
-  executeSQL(sql: string, limit?: number): Observable<QueryExecuteResult> {
-    const request: QueryExecuteRequest = { sql, limit };
+  executeSQL(sql: string, limit?: number, catalog?: string, database?: string): Observable<QueryExecuteResult> {
+    const request: QueryExecuteRequest = { sql, limit, catalog, database };
     return this.api.post<QueryExecuteResult>(`/clusters/queries/execute`, request);
   }
 
