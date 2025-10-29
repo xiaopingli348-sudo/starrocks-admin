@@ -1,4 +1,4 @@
-.PHONY: help build docker-build docker-up docker-down clean
+.PHONY: help build build-force build-clean docker-build docker-up docker-down clean
 
 # Project paths
 PROJECT_ROOT := $(shell pwd)
@@ -12,27 +12,26 @@ help:
 	@echo "StarRocks Admin - Build Commands:"
 	@echo ""
 	@echo "Build:"
-	@echo "  make build        - Build backend and frontend, then create distribution package"
+	@echo "  make build        - 增量构建（仅构建有修改的组件）"
+	@echo "  make build-force  - 强制构建所有组件"
+	@echo "  make build-clean  - 清理缓存后构建"
 	@echo "  make docker-build - Build Docker image"
 	@echo "  make docker-up    - Start Docker container"
 	@echo "  make docker-down  - Stop Docker container"
 	@echo "  make clean        - Clean build artifacts"
 	@echo ""
 
-# Build both backend and frontend, then create distribution package
+# 增量构建（默认）
 build:
-	@echo "Building StarRocks Admin..."
-	@bash build/build-backend.sh
-	@bash build/build-frontend.sh
-	@echo "Build complete! Output: $(DIST_DIR)"
-	@echo "Creating distribution package..."
-	@TIMESTAMP=$$(date +"%Y%m%d"); \
-	PACKAGE_NAME="starrocks-admin-$$TIMESTAMP.tar.gz"; \
-	PACKAGE_PATH="$(DIST_DIR)/$$PACKAGE_NAME"; \
-	echo "Package name: $$PACKAGE_NAME"; \
-	cd $(DIST_DIR) && tar -czf "$$PACKAGE_NAME" --transform 's,^,starrocks-admin/,' *; \
-	echo "Package created: $$PACKAGE_PATH"; \
-	echo "To extract: tar -xzf $$PACKAGE_NAME"
+	@bash build/build-optimized.sh
+
+# 强制构建所有组件
+build-force:
+	@bash build/build-optimized.sh --force
+
+# 清理缓存后构建
+build-clean:
+	@bash build/build-optimized.sh --clean
 
 # Build Docker image
 docker-build:
