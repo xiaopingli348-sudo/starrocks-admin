@@ -125,6 +125,51 @@ enabled = true
 web_root = "web"
 ```
 
+## Development
+
+### Hot Reload Development
+
+For rapid development iteration, the project supports hot reload:
+
+```bash
+# Start development environment with hot reload (recommended)
+make dev
+
+# Or start in background mode
+make dev-start
+
+# View service status
+make dev-status
+
+# View real-time logs
+make dev-logs
+
+# Stop services
+make dev-stop
+
+# Restart services
+make dev-restart
+```
+
+### Development Features
+
+- **Hot Reload**: Code changes automatically reload without manual restart
+- **Backend**: Uses `cargo-watch` for automatic Rust code recompilation
+- **Frontend**: Angular development server with built-in hot reload
+- **Fast Iteration**: Modify code → Save → Instant preview
+
+### Quick Commands
+
+```bash
+# One command to start everything with hot reload
+make dev
+
+# The development environment will be available at:
+# - Frontend: http://localhost:4200
+# - Backend:  http://localhost:8081
+# - API Docs: http://localhost:8081/api-docs
+```
+
 ## Contributing
 
 We welcome all forms of contributions! Please follow these steps:
@@ -268,6 +313,51 @@ file = "logs/starrocks-admin.log"
 [static_config]
 enabled = true
 web_root = "web"
+```
+
+## 开发指南
+
+### 热重载开发
+
+为了支持快速开发迭代，项目支持热重载：
+
+```bash
+# 启动开发环境（热重载模式，推荐）
+make dev
+
+# 或以后台模式启动
+make dev-start
+
+# 查看服务状态
+make dev-status
+
+# 查看实时日志
+make dev-logs
+
+# 停止服务
+make dev-stop
+
+# 重启服务
+make dev-restart
+```
+
+### 开发特性
+
+- **热重载**：代码修改自动重新加载，无需手动重启
+- **后端**：使用 `cargo-watch` 实现 Rust 代码自动重新编译
+- **前端**：Angular 开发服务器自带热重载
+- **快速迭代**：修改代码 → 保存 → 即时预览
+
+### 快速命令
+
+```bash
+# 一个命令启动所有服务（热重载）
+make dev
+
+# 开发环境将运行在：
+# - 前端: http://localhost:4200
+# - 后端:  http://localhost:8081
+# - API文档: http://localhost:8081/api-docs
 ```
 
 ## 贡献

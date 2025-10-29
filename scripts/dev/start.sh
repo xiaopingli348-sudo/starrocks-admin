@@ -2,7 +2,7 @@
 
 #
 # StarRocks Admin - Development Environment (One-Click Start)
-# 开发环境一键启动（同时启动前后端）
+# 开发环境一键启动（同时启动前后端，支持热加载）
 #
 
 set -e
@@ -16,6 +16,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+
+MODE="${1:-dev}"  # dev: 热重载模式 | start: 后台模式
 
 echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║   StarRocks Admin - Dev Environment   ║${NC}"
@@ -40,7 +42,7 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Check environment
-echo -e "${YELLOW}[1/3]${NC} Checking environment..."
+echo -e "${YELLOW}[1/4]${NC} Checking environment..."
 if ! command -v cargo &> /dev/null; then
     echo -e "${RED}✗ Rust/Cargo not found. Please install Rust.${NC}"
     exit 1
@@ -53,10 +55,17 @@ echo -e "${GREEN}✓ Environment OK${NC}"
 echo ""
 
 # Start backend
-echo -e "${YELLOW}[2/3]${NC} Starting backend..."
-bash scripts/dev/start_backend.sh &
-BACKEND_PID=$!
-sleep 3
+if [ "$MODE" = "dev" ]; then
+    echo -e "${YELLOW}[2/4]${NC} Starting backend with hot reload..."
+    bash scripts/dev/start_backend_dev.sh &
+    BACKEND_PID=$!
+    sleep 5
+else
+    echo -e "${YELLOW}[2/4]${NC} Starting backend..."
+    bash scripts/dev/start_backend.sh &
+    BACKEND_PID=$!
+    sleep 3
+fi
 
 # Check backend health
 if curl -s http://0.0.0.0:8081/health > /dev/null 2>&1; then
@@ -67,7 +76,20 @@ fi
 echo ""
 
 # Start frontend
-echo -e "${YELLOW}[3/3]${NC} Starting frontend..."
+echo -e "${YELLOW}[3/4]${NC} Starting frontend..."
+cd frontend
+
+# Check if node_modules exists
+if [ ! -d "node_modules" ]; then
+    echo -e "${YELLOW}Installing frontend dependencies...${NC}"
+    npm install
+fi
+
+npm start &
+FRONTEND_PID=$!
+sleep 3
+
+echo -e "${YELLOW}[4/4]${NC} Services starting..."
 echo -e "${BLUE}════════════════════════════════════════${NC}"
 echo -e ""
 echo -e "${GREEN}Development environment started!${NC}"
@@ -77,14 +99,12 @@ echo -e "  Frontend: ${GREEN}http://localhost:4200${NC}"
 echo -e "  Backend:  ${GREEN}http://0.0.0.0:8081${NC}"
 echo -e "  API Docs: ${GREEN}http://0.0.0.0:8081/api-docs${NC}"
 echo -e ""
+if [ "$MODE" = "dev" ]; then
+    echo -e "${GREEN}✓ Hot reload enabled - code changes auto-reload${NC}"
+fi
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
 echo -e "${BLUE}════════════════════════════════════════${NC}"
 echo ""
 
-# Run frontend in foreground
-cd frontend
-npm start &
-FRONTEND_PID=$!
-
-# Wait for frontend
+# Wait for processes
 wait $FRONTEND_PID
