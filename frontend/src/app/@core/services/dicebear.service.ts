@@ -20,12 +20,12 @@ export interface DiceBearOptions {
   providedIn: 'root'
 })
 export class DiceBearService {
-  private readonly baseUrl = 'https://api.dicebear.com/9.x';
+  private readonly baseUrl = 'https://api.dicebear.com/7.x';
   
   // 可用的头像样式 - 支持所有风格
   readonly avatarStyles = [
-    { name: 'adventurer', label: '冒险家', description: '卡通风格冒险家头像' },
     { name: 'avataaars', label: 'Avataaars', description: '经典Avataaars风格' },
+    { name: 'adventurer', label: '冒险家', description: '卡通风格冒险家头像' },
     { name: 'bottts', label: '机器人', description: '机器人风格头像' },
     { name: 'croodles', label: '涂鸦', description: '手绘涂鸦风格' },
     { name: 'fun-emoji', label: '表情符号', description: '有趣的表情符号' },
@@ -112,9 +112,11 @@ export class DiceBearService {
    * @param style 头像样式
    * @returns 头像URL
    */
-  generateAvatarForUser(username: string, style: string = 'lorelei'): string {
+  generateAvatarForUser(username: string, style: string = 'avataaars'): string {
     // 使用用户名作为seed，确保同一用户总是得到相同的头像
     const seed = username.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // 使用简单的URL格式，就像你提供的链接
     return `${this.baseUrl}/${style}/svg?seed=${encodeURIComponent(seed)}`;
   }
 
@@ -124,16 +126,16 @@ export class DiceBearService {
    * @param style 头像样式
    * @returns 头像URL数组
    */
-  generateAvatarOptions(count: number = 6, style: string = 'lorelei'): string[] {
+  generateAvatarOptions(count: number = 6, style: string = 'avataaars'): string[] {
     const avatars: string[] = [];
     
     for (let i = 0; i < count; i++) {
-      // 使用更简单的方法，只使用seed参数，这是最安全的方式
+      // 生成随机seed
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 15);
       const seed = `avatar-${i}-${timestamp}-${random}`;
       
-      // 只使用seed参数，避免其他可能不兼容的参数
+      // 使用简单的URL格式
       const url = `${this.baseUrl}/${style}/svg?seed=${encodeURIComponent(seed)}`;
       avatars.push(url);
     }

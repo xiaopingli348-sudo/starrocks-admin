@@ -27,7 +27,7 @@ export class UserSettingsComponent implements OnInit {
   errors: string[] = [];
   showPasswordFields = false;
   showAvatarSelection = false;
-  selectedAvatarStyle = 'lorelei';
+  selectedAvatarStyle = 'avataaars';
 
   // DiceBear头像选项
   availableAvatars: string[] = [];

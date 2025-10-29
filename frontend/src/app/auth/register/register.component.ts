@@ -21,7 +21,7 @@ export class RegisterComponent {
   errors: string[] = [];
   messages: string[] = [];
   showMessages = false;
-  selectedAvatarStyle = 'lorelei';
+  selectedAvatarStyle = 'avataaars';
 
   // DiceBear头像选项
   availableAvatars: string[] = [];

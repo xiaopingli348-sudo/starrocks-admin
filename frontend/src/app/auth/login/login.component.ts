@@ -14,6 +14,7 @@ export class LoginComponent implements OnInit {
     username: '',
     password: ''
   };
+  rememberMe = false;
   errors: string[] = [];
   messages: string[] = [];
   showMessages = false;
@@ -29,6 +30,13 @@ export class LoginComponent implements OnInit {
   ngOnInit() {
     // Get return URL from route parameters or default to dashboard
     this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/pages/starrocks/dashboard';
+    
+    // Load saved username if remember me was checked
+    const savedUsername = localStorage.getItem('remembered_username');
+    if (savedUsername) {
+      this.user.username = savedUsername;
+      this.rememberMe = true;
+    }
     
     // If already logged in, redirect to return URL
     if (this.authService.isAuthenticated()) {
@@ -52,6 +60,14 @@ export class LoginComponent implements OnInit {
         this.submitted = false;
         this.messages = ['Successfully logged in!'];
         this.showMessages = true;
+        
+        // Handle remember me functionality
+        if (this.rememberMe) {
+          localStorage.setItem('remembered_username', this.user.username);
+        } else {
+          localStorage.removeItem('remembered_username');
+        }
+        
         this.toastrService.success('Welcome back!', 'Login Successful');
         // Navigate to return URL or dashboard after short delay
         setTimeout(() => {
