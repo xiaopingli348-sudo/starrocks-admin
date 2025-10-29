@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { NbToastrService } from '@nebular/theme';
 import { AuthService } from '../../@core/data/auth.service';
+import { DiceBearService } from '../../@core/services/dicebear.service';
 
 @Component({
   selector: 'ngx-register',
@@ -20,28 +21,35 @@ export class RegisterComponent {
   errors: string[] = [];
   messages: string[] = [];
   showMessages = false;
+  selectedAvatarStyle = 'avataaars';
 
-  // 可用的头像列表
-  availableAvatars = [
-    'assets/images/nick.png',
-    'assets/images/eva.png',
-    'assets/images/jack.png',
-    'assets/images/kate.png',
-    'assets/images/lee.png',
-    'assets/images/alan.png',
-  ];
+  // DiceBear头像选项
+  availableAvatars: string[] = [];
+  avatarStyles = this.diceBearService.avatarStyles;
 
   constructor(
     protected router: Router,
     private authService: AuthService,
-    private toastrService: NbToastrService
+    private toastrService: NbToastrService,
+    private diceBearService: DiceBearService
   ) {
+    this.generateAvatarOptions();
     // 随机选择一个头像
-    this.user.avatar = this.availableAvatars[Math.floor(Math.random() * this.availableAvatars.length)];
+    if (this.availableAvatars.length > 0) {
+      this.user.avatar = this.availableAvatars[Math.floor(Math.random() * this.availableAvatars.length)];
+    }
   }
 
   selectAvatar(avatar: string) {
     this.user.avatar = avatar;
+  }
+
+  generateAvatarOptions() {
+    this.availableAvatars = this.diceBearService.generateAvatarOptions(6, this.selectedAvatarStyle);
+    // 如果当前没有选择头像，随机选择一个
+    if (!this.user.avatar && this.availableAvatars.length > 0) {
+      this.user.avatar = this.availableAvatars[Math.floor(Math.random() * this.availableAvatars.length)];
+    }
   }
 
   register(): void {
