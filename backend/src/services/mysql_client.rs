@@ -13,12 +13,52 @@ impl MySQLClient {
     }
 
     /// Execute a query and return results as (column_names, rows)
-    pub async fn query_raw(&self, sql: &str) -> Result<(Vec<String>, Vec<Vec<String>>), ApiError> {
+    /// Optionally set catalog and database context before executing the query
+    pub async fn query_raw(
+        &self,
+        sql: &str,
+        catalog: Option<&str>,
+        database: Option<&str>,
+    ) -> Result<(Vec<String>, Vec<Vec<String>>), ApiError> {
         tracing::debug!("Getting MySQL connection from pool...");
         let mut conn = self.pool.get_conn().await.map_err(|e| {
             tracing::error!("Failed to get connection from pool: {}", e);
             ApiError::cluster_connection_failed(format!("Failed to get connection: {}", e))
         })?;
+
+        // First, set catalog if provided (on the same connection)
+        // Note: StarRocks may not support USE CATALOG via MySQL protocol
+        // If catalog is the default catalog or USE CATALOG fails, we'll continue anyway
+        if let Some(cat) = catalog {
+            if !cat.is_empty() && cat != "default_catalog" {
+                // Try USE CATALOG without backticks (StarRocks syntax)
+                let use_catalog_sql = format!("USE CATALOG {}", cat);
+                tracing::debug!("Executing USE CATALOG on same connection: {}", use_catalog_sql);
+                if let Err(e) = conn.query::<mysql_async::Row, _>(&use_catalog_sql).await {
+                    // If USE CATALOG fails (not supported or already active), continue with query
+                    // The default catalog is usually already active
+                    tracing::warn!("USE CATALOG {} failed (may not be supported): {}, continuing anyway", cat, e);
+                    // Don't fail - continue with the query, it might work in the default catalog context
+                }
+            }
+            // If catalog is "default_catalog" or empty, no need to switch
+        }
+
+        // Then, set database if provided (on the same connection)
+        if let Some(db) = database {
+            if !db.is_empty() {
+                let use_db_sql = format!("USE {}", db);
+                tracing::debug!("Executing USE DATABASE on same connection: {}", use_db_sql);
+                if let Err(e) = conn.query::<mysql_async::Row, _>(&use_db_sql).await {
+                    tracing::warn!("Failed to execute USE DATABASE {}: {}", db, e);
+                    drop(conn);
+                    return Err(ApiError::internal_error(format!(
+                        "Failed to switch to database {}: {}",
+                        db, e
+                    )));
+                }
+            }
+        }
 
         tracing::debug!("Executing MySQL query: '{}'", sql);
         let rows: Vec<mysql_async::Row> = conn.query(sql).await.map_err(|e| {
@@ -71,7 +111,7 @@ impl MySQLClient {
     /// Execute a query and return results as Vec<serde_json::Value> (JSON objects)
     /// Each row is a JSON object with column names as keys
     pub async fn query(&self, sql: &str) -> Result<Vec<serde_json::Value>, ApiError> {
-        let (column_names, rows) = self.query_raw(sql).await?;
+        let (column_names, rows) = self.query_raw(sql, None, None).await?;
 
         let mut result = Vec::new();
         for row in rows {
@@ -204,7 +244,7 @@ mod tests {
         let pool = create_test_pool().await;
         let client = MySQLClient::from_pool(pool);
 
-        let (columns, rows) = client.query_raw("SELECT 1").await.unwrap();
+        let (columns, rows) = client.query_raw("SELECT 1", None, None).await.unwrap();
         assert_eq!(columns.len(), 1);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0][0], "1");
@@ -215,7 +255,7 @@ mod tests {
         let pool = create_test_pool().await;
         let client = MySQLClient::from_pool(pool);
 
-        let (_columns, rows) = client.query_raw("SELECT 'hello'").await.unwrap();
+        let (_columns, rows) = client.query_raw("SELECT 'hello'", None, None).await.unwrap();
         assert_eq!(rows[0][0], "hello");
     }
 
@@ -231,7 +271,7 @@ mod tests {
 
         for _i in 1..=50 {
             let sql = format!("SELECT get_query_profile('{}')", query_id);
-            let result = client.query_raw(&sql).await;
+            let result = client.query_raw(&sql, None, None).await;
 
             match result {
                 Ok((_, rows)) => {
@@ -257,7 +297,7 @@ mod tests {
 
         // Test the actual problematic query
         let sql = "select * from information_schema.partitions_meta order by Max_CS LIMIT 5";
-        let result = client.query_raw(sql).await;
+        let result = client.query_raw(sql, None, None).await;
 
         match result {
             Ok((_columns, rows)) => {

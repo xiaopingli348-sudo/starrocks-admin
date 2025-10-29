@@ -1,6 +1,6 @@
-import { Component, OnInit, OnDestroy, TemplateRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, TemplateRef, ViewChild, AfterViewInit, ElementRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { NbToastrService, NbDialogService } from '@nebular/theme';
+import { NbToastrService, NbDialogService, NbThemeService } from '@nebular/theme';
 import { LocalDataSource } from 'ng2-smart-table';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -8,13 +8,20 @@ import { NodeService, QueryExecuteResult } from '../../../../@core/data/node.ser
 import { ClusterContextService } from '../../../../@core/data/cluster-context.service';
 import { Cluster } from '../../../../@core/data/cluster.service';
 import { ErrorHandler } from '../../../../@core/utils/error-handler';
+import { EditorView, basicSetup } from 'codemirror';
+import { sql } from '@codemirror/lang-sql';
+import { oneDark } from '@codemirror/theme-one-dark';
+import { autocompletion } from '@codemirror/autocomplete';
+import { format } from 'sql-formatter';
 
 @Component({
   selector: 'ngx-query-execution',
   templateUrl: './query-execution.component.html',
   styleUrls: ['./query-execution.component.scss'],
 })
-export class QueryExecutionComponent implements OnInit, OnDestroy {
+export class QueryExecutionComponent implements OnInit, OnDestroy, AfterViewInit {
+  @ViewChild('editorContainer', { static: false }) editorContainer!: ElementRef;
+
   // Data sources
   runningSource: LocalDataSource = new LocalDataSource();
   realtimeResultSource: LocalDataSource = new LocalDataSource();
@@ -38,6 +45,19 @@ export class QueryExecutionComponent implements OnInit, OnDestroy {
     { value: 60, label: '1分钟' },
   ];
   private destroy$ = new Subject<void>();
+
+  // CodeMirror editor
+  private editorView: EditorView | null = null;
+  private currentTheme: string = 'default';
+
+  // Catalog and Database selection
+  catalogs: string[] = [];
+  selectedCatalog: string = '';
+  loadingCatalogs: boolean = false;
+  
+  databases: string[] = [];
+  selectedDatabase: string = '';
+  loadingDatabases: boolean = false;
 
   // Real-time query state
   sqlInput: string = '';
@@ -80,10 +100,204 @@ export class QueryExecutionComponent implements OnInit, OnDestroy {
     private toastrService: NbToastrService,
     private clusterContext: ClusterContextService,
     private dialogService: NbDialogService,
+    private themeService: NbThemeService,
   ) {
     // Try to get clusterId from route first (for direct navigation)
     const routeClusterId = parseInt(this.route.snapshot.paramMap.get('clusterId') || '0', 10);
     this.clusterId = routeClusterId;
+  }
+
+  ngAfterViewInit(): void {
+    // Initialize CodeMirror editor after view is ready
+    setTimeout(() => {
+      this.initEditor();
+      this.loadCatalogs();
+    }, 100);
+
+    // Subscribe to theme changes
+    this.themeService.onThemeChange()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((theme: any) => {
+        this.currentTheme = theme.name;
+        this.updateEditorTheme();
+      });
+
+    // Get current theme
+    this.themeService.getJsTheme()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((theme: any) => {
+        this.currentTheme = theme?.name || 'default';
+        this.updateEditorTheme();
+      });
+  }
+
+  private initEditor(): void {
+    if (!this.editorContainer?.nativeElement) {
+      return;
+    }
+
+    const isDark = this.currentTheme === 'dark' || this.currentTheme === 'cosmic';
+
+    const extensions = [
+      basicSetup,
+      sql(),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          this.sqlInput = update.state.doc.toString();
+        }
+      }),
+      EditorView.theme({
+        '&': {
+          height: '400px',
+          fontSize: '16.8px', // Increase font size by 20% (from 14px)
+        },
+        '.cm-content': {
+          fontSize: '16.8px', // Increase font size by 20%
+        },
+        '.cm-line': {
+          fontSize: '16.8px', // Increase font size by 20%
+        },
+        '.cm-scroller': {
+          overflow: 'auto',
+        },
+      }),
+    ];
+
+    if (isDark) {
+      extensions.push(oneDark);
+    }
+
+    // SQL keyword autocomplete
+    extensions.push(
+      autocompletion({
+        override: [
+          (context) => {
+            const word = context.matchBefore(/\w*/);
+            if (!word) return null;
+            if (word.from === word.to && !context.explicit) return null;
+            
+            const sqlKeywords = [
+              'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT',
+              'JOIN', 'INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN',
+              'ON', 'AS', 'AND', 'OR', 'NOT', 'IN', 'EXISTS',
+              'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER',
+              'USE', 'SHOW', 'DESCRIBE', 'EXPLAIN'
+            ];
+            
+            const options = sqlKeywords
+              .filter(keyword => keyword.toLowerCase().startsWith(word.text.toLowerCase()))
+              .map(keyword => ({ label: keyword, type: 'keyword' }));
+            
+            return {
+              from: word.from,
+              options: options.length > 0 ? options : sqlKeywords.map(k => ({ label: k, type: 'keyword' }))
+            };
+          }
+        ]
+      })
+    );
+
+    this.editorView = new EditorView({
+      doc: this.sqlInput,
+      extensions,
+      parent: this.editorContainer.nativeElement,
+    });
+  }
+
+  private updateEditorTheme(): void {
+    if (!this.editorView) return;
+
+    const isDark = this.currentTheme === 'dark' || this.currentTheme === 'cosmic';
+    
+    // Reinitialize editor with new theme
+    this.destroyEditor();
+    setTimeout(() => {
+      this.initEditor();
+    }, 50);
+  }
+
+  private destroyEditor(): void {
+    if (this.editorView) {
+      this.editorView.destroy();
+      this.editorView = null;
+    }
+  }
+
+  private loadCatalogs(): void {
+    if (!this.clusterId) {
+      return;
+    }
+
+    this.loadingCatalogs = true;
+    this.nodeService.getCatalogs().subscribe({
+      next: (catalogs) => {
+        this.catalogs = catalogs;
+        this.loadingCatalogs = false;
+        console.log(`Loaded ${catalogs?.length || 0} catalogs:`, catalogs);
+        // Auto-select first catalog if available (always select if only one or first available)
+        if (catalogs.length > 0) {
+          // If no catalog selected or selected catalog not in list, select first one
+          if (!this.selectedCatalog || !catalogs.includes(this.selectedCatalog)) {
+            this.selectedCatalog = catalogs[0];
+            console.log(`Auto-selected catalog: ${this.selectedCatalog}`);
+            // Load databases for selected catalog
+            this.loadDatabases();
+          } else if (this.selectedCatalog && catalogs.includes(this.selectedCatalog)) {
+            // If catalog is already selected and still in list, just refresh databases
+            this.loadDatabases();
+          }
+        } else {
+          this.selectedCatalog = '';
+          this.databases = [];
+        }
+      },
+      error: (error) => {
+        this.loadingCatalogs = false;
+        console.error('Failed to load catalogs:', error);
+      },
+    });
+  }
+
+  onCatalogChange(catalog?: string): void {
+    // When catalog changes, reload databases for that catalog
+    const newCatalog = catalog !== undefined ? catalog : this.selectedCatalog;
+    console.log('Catalog changed to:', newCatalog);
+    
+    // Clear database selection and list
+    this.selectedDatabase = '';
+    this.databases = [];
+    
+    if (newCatalog) {
+      // Small delay to ensure catalog selection is updated
+      setTimeout(() => {
+        this.loadDatabases();
+      }, 100);
+    }
+  }
+
+  private loadDatabases(): void {
+    if (!this.clusterId || !this.selectedCatalog) {
+      this.databases = [];
+      return;
+    }
+
+    this.loadingDatabases = true;
+    this.nodeService.getDatabases(this.selectedCatalog).subscribe({
+      next: (databases) => {
+        this.databases = databases || [];
+        this.loadingDatabases = false;
+        console.log(`Loaded ${databases?.length || 0} databases for catalog: ${this.selectedCatalog}`);
+      },
+      error: (error) => {
+        this.loadingDatabases = false;
+        this.databases = [];
+        console.error('Failed to load databases:', error);
+        // Show error toast only if it's a real error (not just empty result)
+        if (error.status !== 200 && error.status !== 404) {
+          // Could optionally show a toast here, but maybe not needed for empty result
+        }
+      },
+    });
   }
 
   ngOnInit(): void {
@@ -97,6 +311,11 @@ export class QueryExecutionComponent implements OnInit, OnDestroy {
           const newClusterId = cluster.id;
           if (this.clusterId !== newClusterId) {
             this.clusterId = newClusterId;
+            // Load catalogs when cluster changes (this will auto-select and load databases)
+            this.selectedCatalog = '';
+            this.selectedDatabase = '';
+            this.databases = [];
+            this.loadCatalogs();
             // Only load if not on realtime tab
             if (this.selectedTab !== 'realtime') {
               this.loadCurrentTab();
@@ -120,6 +339,7 @@ export class QueryExecutionComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopAutoRefresh();
+    this.destroyEditor();
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -199,7 +419,12 @@ export class QueryExecutionComponent implements OnInit, OnDestroy {
     this.queryResult = null;
     this.resultSettings = null;
 
-    this.nodeService.executeSQL(this.sqlInput.trim(), this.queryLimit).subscribe({
+    this.nodeService.executeSQL(
+      this.sqlInput.trim(), 
+      this.queryLimit, 
+      this.selectedCatalog || undefined,
+      this.selectedDatabase || undefined
+    ).subscribe({
       next: (result) => {
         this.queryResult = result;
         this.executionTime = result.execution_time_ms;
@@ -249,6 +474,16 @@ export class QueryExecutionComponent implements OnInit, OnDestroy {
 
   clearSQL(): void {
     this.sqlInput = '';
+    if (this.editorView) {
+      const transaction = this.editorView.state.update({
+        changes: {
+          from: 0,
+          to: this.editorView.state.doc.length,
+          insert: '',
+        },
+      });
+      this.editorView.dispatch(transaction);
+    }
     this.queryResult = null;
     this.resultSettings = null;
     this.executionTime = 0;
@@ -259,13 +494,31 @@ export class QueryExecutionComponent implements OnInit, OnDestroy {
     if (!this.sqlInput) {
       return;
     }
-    // Simple SQL formatting (basic implementation)
-    let formatted = this.sqlInput.trim();
-    // Add line breaks before major keywords
-    formatted = formatted.replace(/\s+(SELECT|FROM|WHERE|GROUP BY|ORDER BY|LIMIT|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN)/gi, '\n$1');
-    // Capitalize keywords
-    formatted = formatted.replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|LIMIT|AS|ON|AND|OR|JOIN|LEFT|RIGHT|INNER|OUTER|DESC|ASC)\b/gi, match => match.toUpperCase());
-    this.sqlInput = formatted;
+    try {
+      // Use sql-formatter for proper SQL formatting
+      const formatted = format(this.sqlInput.trim(), {
+        language: 'sql',
+        tabWidth: 2,
+        keywordCase: 'upper',
+        identifierCase: 'lower',
+      });
+      
+      this.sqlInput = formatted;
+      
+      // Update editor content
+      if (this.editorView) {
+        const transaction = this.editorView.state.update({
+          changes: {
+            from: 0,
+            to: this.editorView.state.doc.length,
+            insert: formatted,
+          },
+        });
+        this.editorView.dispatch(transaction);
+      }
+    } catch (error) {
+      this.toastrService.warning('格式化失败，使用原始SQL', '提示');
+    }
   }
 
   // Export results to CSV

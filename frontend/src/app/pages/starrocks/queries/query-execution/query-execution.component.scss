@@ -1,7 +1,84 @@
 // Copy styles from the original queries component
+
+// Adjust card body padding to align content with edges
+:host ::ng-deep nb-card-body {
+  padding: 0 !important;
+}
+
+:host ::ng-deep nb-tabset {
+  .tabset {
+    padding: 0;
+    margin-bottom: 0;
+  }
+  
+  // Reduce tab content padding
+  .tab-content {
+    padding: 0 !important;
+  }
+  
+  // Reduce spacing between tabs and content
+  nb-tab {
+    padding: 0 !important;
+  }
+}
+
 .realtime-query-container {
+  padding: 0.3rem; // Minimal padding on all sides
   .sql-editor-section {
     margin-bottom: 1.5rem;
+    
+    .catalog-database-selector {
+      // Ensure buttons stay on the right and don't wrap
+      @media (max-width: 768px) {
+        flex-direction: column;
+        align-items: flex-start !important;
+        
+        .editor-action-buttons {
+          width: 100%;
+          justify-content: flex-end;
+          margin-top: 0.5rem;
+        }
+      }
+    }
+    
+    .codemirror-container {
+      border: 1px solid nb-theme(border-basic-color-4);
+      border-radius: nb-theme(border-radius);
+      overflow: hidden;
+      background-color: nb-theme(background-basic-color-1);
+      padding: 1px; // Add minimal padding to ensure grid lines are visible at edges
+      
+      // Add subtle grid background
+      background-image: 
+        linear-gradient(rgba(128, 128, 128, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(128, 128, 128, 0.08) 1px, transparent 1px);
+      background-size: 20px 20px;
+      background-position: 0 0;
+      
+      // Increase font size by 20% (from 14px to 16.8px)
+      font-size: 1.2em;
+      
+      :host-context(.dark-theme) & {
+        border-color: nb-theme(border-basic-color-3);
+      }
+      
+      // CodeMirror editor content font size
+      :deep(.cm-editor) {
+        font-size: 1.2em;
+        
+        .cm-content {
+          font-size: 1.2em;
+        }
+        
+        .cm-line {
+          font-size: 1.2em;
+        }
+      }
+    }
+    
+    .editor-action-buttons {
+      flex-shrink: 0;
+    }
     
     .sql-editor {
       font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -51,7 +128,39 @@
     .result-actions {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 1rem;
+      
+      .result-stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background-color: nb-theme(background-basic-color-2);
+        border-radius: nb-theme(border-radius);
+        border: 1px solid nb-theme(border-basic-color-3);
+        
+        .stat-icon {
+          font-size: 1.25rem;
+        }
+        
+        .stat-label {
+          color: nb-theme(text-hint-color);
+          font-size: 0.875rem;
+        }
+        
+        .stat-value {
+          font-weight: 600;
+          font-size: 1rem;
+          
+          &.stat-time {
+            color: nb-theme(color-success-default);
+          }
+          
+          &.stat-count {
+            color: nb-theme(color-info-default);
+          }
+        }
+      }
     }
   }
   

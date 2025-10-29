@@ -725,7 +725,7 @@ impl OverviewService {
             GROUP BY TABLE_SCHEMA
         "#;
 
-        let (columns, rows) = mysql_client.query_raw(sql).await?;
+        let (columns, rows) = mysql_client.query_raw(sql, None, None).await?;
         let mut total_size: i64 = 0;
 
         // Find column indices
@@ -1363,7 +1363,7 @@ impl OverviewService {
             FROM information_schema.materialized_views
         "#;
 
-        let (columns, rows) = mysql_client.query_raw(query).await?;
+        let (columns, rows) = mysql_client.query_raw(query, None, None).await?;
 
         // Build column index map
         let mut col_idx = std::collections::HashMap::new();
@@ -1419,7 +1419,7 @@ impl OverviewService {
             GROUP BY State
         "#;
 
-        let (columns, rows) = mysql_client.query_raw(query).await?;
+        let (columns, rows) = mysql_client.query_raw(query, None, None).await?;
 
         // Build column index map
         let mut col_idx = std::collections::HashMap::new();
@@ -1491,7 +1491,7 @@ impl OverviewService {
             GROUP BY queryType, state
         "#;
 
-        let (columns, rows) = mysql_client.query_raw(query).await?;
+        let (columns, rows) = mysql_client.query_raw(query, None, None).await?;
 
         // Build column index map
         let mut col_idx = std::collections::HashMap::new();
@@ -1547,7 +1547,7 @@ impl OverviewService {
         // Query compaction tasks from FE
         // SHOW PROC '/compactions' shows current running compaction tasks
         let query = "SHOW PROC '/compactions'";
-        let (_headers, rows) = client.query_raw(query).await.unwrap_or((vec![], vec![]));
+        let (_headers, rows) = client.query_raw(query, None, None).await.unwrap_or((vec![], vec![]));
 
         // Count running compaction tasks
         // Note: In StarRocks shared-data mode, there are no separate
@@ -1575,7 +1575,7 @@ impl OverviewService {
     }
 
     /// Get detailed compaction statistics for storage-compute separation architecture
-    ///
+    /// 
     /// This method queries:
     /// 1. Top 10 partitions by compaction score from information_schema.partitions_meta
     /// 2. Running and finished compaction tasks from information_schema.be_cloud_native_compactions
@@ -1621,7 +1621,7 @@ impl OverviewService {
         "#;
 
         let (_headers, rows) = client
-            .query_raw(top_partitions_query)
+            .query_raw(top_partitions_query, None, None)
             .await
             .unwrap_or((vec![], vec![]));
 
@@ -1630,7 +1630,7 @@ impl OverviewService {
             .filter_map(|row| {
                 if row.len() >= 6 {
                     Some(TopPartitionByScore {
-                        db_name: row.first().map(|s| s.to_string()).unwrap_or_default(),
+                        db_name: row.get(0).map(|s| s.to_string()).unwrap_or_default(),
                         table_name: row.get(1).map(|s| s.to_string()).unwrap_or_default(),
                         partition_name: row.get(2).map(|s| s.to_string()).unwrap_or_default(),
                         max_score: row.get(3).and_then(|s| s.parse().ok()).unwrap_or(0.0),
@@ -1648,31 +1648,28 @@ impl OverviewService {
         let task_stats_query = r#"SHOW PROC '/compactions'"#;
 
         let (_headers, rows) = client
-            .query_raw(task_stats_query)
+            .query_raw(&task_stats_query, None, None)
             .await
             .unwrap_or((vec![], vec![]));
 
         tracing::debug!("Compaction PROC query returned {} rows", rows.len());
-
+        
         // Process compaction data in Rust since SHOW PROC cannot be used in subqueries
         let mut total_count = 0;
         let mut running_count = 0;
         let mut finished_count = 0;
         let mut durations: Vec<i64> = Vec::new();
-
+        
         for row in &rows {
             if row.len() >= 5 {
                 // Parse StartTime and FinishTime
                 let start_time_str = row.get(2).map(|s| s.to_string()).unwrap_or_default();
                 let finish_time_str = row.get(4).map(|s| s.to_string()).unwrap_or_default();
-
+                
                 // Check if task is within time range or still running
-                let is_within_time_range = if !start_time_str.is_empty() && start_time_str != "NULL"
-                {
+                let is_within_time_range = if !start_time_str.is_empty() && start_time_str != "NULL" {
                     // Parse start time and check if within range
-                    if let Ok(start_time) =
-                        chrono::NaiveDateTime::parse_from_str(&start_time_str, "%Y-%m-%d %H:%M:%S")
-                    {
+                    if let Ok(start_time) = chrono::NaiveDateTime::parse_from_str(&start_time_str, "%Y-%m-%d %H:%M:%S") {
                         let now = chrono::Utc::now().naive_utc();
                         let time_diff = now.signed_duration_since(start_time);
                         time_diff.num_hours() <= hours_back
@@ -1682,74 +1679,67 @@ impl OverviewService {
                 } else {
                     false
                 };
-
+                
                 let is_running = finish_time_str.is_empty() || finish_time_str == "NULL";
                 let _is_finished = !is_running;
-
+                
                 if is_within_time_range || is_running {
                     total_count += 1;
                     if is_running {
                         running_count += 1;
                     } else {
                         finished_count += 1;
-
+                        
                         // Calculate duration for finished tasks
-                        if !start_time_str.is_empty()
-                            && start_time_str != "NULL"
-                            && !finish_time_str.is_empty()
-                            && finish_time_str != "NULL"
-                            && let (Ok(start_time), Ok(finish_time)) = (
-                                chrono::NaiveDateTime::parse_from_str(
-                                    &start_time_str,
-                                    "%Y-%m-%d %H:%M:%S",
-                                ),
-                                chrono::NaiveDateTime::parse_from_str(
-                                    &finish_time_str,
-                                    "%Y-%m-%d %H:%M:%S",
-                                ),
-                            )
-                        {
-                            let duration =
-                                finish_time.signed_duration_since(start_time).num_seconds();
-                            durations.push(duration);
+                        if !start_time_str.is_empty() && start_time_str != "NULL" && !finish_time_str.is_empty() && finish_time_str != "NULL" {
+                            if let (Ok(start_time), Ok(finish_time)) = (
+                                chrono::NaiveDateTime::parse_from_str(&start_time_str, "%Y-%m-%d %H:%M:%S"),
+                                chrono::NaiveDateTime::parse_from_str(&finish_time_str, "%Y-%m-%d %H:%M:%S")
+                            ) {
+                                let duration = finish_time.signed_duration_since(start_time).num_seconds();
+                                durations.push(duration);
+                            }
                         }
                     }
                 }
             }
         }
-
-        let task_stats = CompactionTaskStats { total_count, running_count, finished_count };
-
-        tracing::debug!(
-            "Processed compaction stats: total={}, running={}, finished={}",
+        
+        let task_stats = CompactionTaskStats {
             total_count,
             running_count,
-            finished_count
-        );
+            finished_count,
+        };
+        
+        tracing::debug!("Processed compaction stats: total={}, running={}, finished={}", total_count, running_count, finished_count);
 
         // Calculate duration statistics from the durations we collected
         let duration_stats = if durations.is_empty() {
-            CompactionDurationStats { min_duration_ms: 0, max_duration_ms: 0, avg_duration_ms: 0 }
+            CompactionDurationStats {
+                min_duration_ms: 0,
+                max_duration_ms: 0,
+                avg_duration_ms: 0,
+            }
         } else {
             let min_duration = durations.iter().min().unwrap_or(&0);
             let max_duration = durations.iter().max().unwrap_or(&0);
             let avg_duration = durations.iter().sum::<i64>() / durations.len() as i64;
-
+            
             CompactionDurationStats {
                 min_duration_ms: min_duration * 1000,
                 max_duration_ms: max_duration * 1000,
                 avg_duration_ms: avg_duration * 1000,
             }
         };
+        
+        tracing::debug!("Duration stats: min={}ms, max={}ms, avg={}ms", 
+            duration_stats.min_duration_ms, duration_stats.max_duration_ms, duration_stats.avg_duration_ms);
 
-        tracing::debug!(
-            "Duration stats: min={}ms, max={}ms, avg={}ms",
-            duration_stats.min_duration_ms,
-            duration_stats.max_duration_ms,
-            duration_stats.avg_duration_ms
-        );
-
-        Ok(CompactionDetailStats { top_partitions, task_stats, duration_stats })
+        Ok(CompactionDetailStats {
+            top_partitions,
+            task_stats,
+            duration_stats,
+        })
     }
 
     /// Module 12: Get session stats from SHOW PROCESSLIST
@@ -1767,7 +1757,7 @@ impl OverviewService {
 
         // Query SHOW PROCESSLIST to get current connections
         let query = "SHOW FULL PROCESSLIST";
-        let (_headers, rows) = client.query_raw(query).await?;
+        let (_headers, rows) = client.query_raw(query, None, None).await?;
 
         let current_connections = rows.len() as i32;
 
@@ -1905,7 +1895,7 @@ impl OverviewService {
 
         // Query StarRocks version using SELECT VERSION()
         let sql = "SELECT VERSION() as version";
-        let (columns, rows) = mysql_client.query_raw(sql).await?;
+        let (columns, rows) = mysql_client.query_raw(sql, None, None).await?;
 
         // Find the version column index
         if let Some(version_idx) = columns

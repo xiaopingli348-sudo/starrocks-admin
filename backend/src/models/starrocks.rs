@@ -317,6 +317,10 @@ pub struct QueryExecuteRequest {
     pub sql: String,
     #[serde(default = "default_limit")]
     pub limit: Option<i32>, // Optional limit, default 1000
+    #[serde(default)]
+    pub catalog: Option<String>, // Optional catalog name
+    #[serde(default)]
+    pub database: Option<String>, // Optional database name, will execute USE database before SQL
 }
 
 fn default_limit() -> Option<i32> {
@@ -352,4 +356,17 @@ pub struct ProfileListItem {
 pub struct ProfileDetail {
     pub query_id: String,
     pub profile_content: String,
+}
+
+// Catalog with its databases
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CatalogWithDatabases {
+    pub catalog: String,
+    pub databases: Vec<String>,
+}
+
+// Response containing all catalogs with their databases
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CatalogsWithDatabasesResponse {
+    pub catalogs: Vec<CatalogWithDatabases>,
 }
