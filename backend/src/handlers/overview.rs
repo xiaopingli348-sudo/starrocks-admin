@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use crate::AppState;
 use crate::services::{
-    CapacityPrediction, ClusterOverview, DataStatistics, ExtendedClusterOverview, HealthCard,
-    PerformanceTrends, ResourceTrends, TimeRange,
+    CapacityPrediction, ClusterOverview, CompactionDetailStats, DataStatistics, 
+    ExtendedClusterOverview, HealthCard, PerformanceTrends, ResourceTrends, TimeRange,
 };
 use crate::utils::ApiResult;
 
@@ -287,4 +287,53 @@ pub async fn get_extended_cluster_overview(
         .await?;
 
     Ok(Json(overview))
+}
+
+/// Get compaction detail statistics for storage-compute separation architecture
+///
+/// Returns detailed compaction monitoring including:
+/// - Top 10 partitions by compaction score
+/// - Running and finished compaction task counts
+/// - Duration statistics (min, max, avg)
+#[utoipa::path(
+    get,
+    path = "/api/clusters/overview/compaction-details",
+    params(
+        ("time_range" = Option<String>, Query, description = "Time range: 1h, 6h, 24h, 3d (default: 1h)")
+    ),
+    responses(
+        (status = 200, description = "Compaction detail statistics", body = CompactionDetailStats),
+        (status = 404, description = "No active cluster found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "Cluster Overview"
+)]
+pub async fn get_compaction_detail_stats(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<TrendQueryParams>,
+) -> ApiResult<Json<CompactionDetailStats>> {
+    let cluster = state.cluster_service.get_active_cluster().await?;
+    
+    // Convert TimeRange enum to string for the service method
+    let time_range_str = match params.time_range {
+        TimeRange::Hours1 => "1h",
+        TimeRange::Hours6 => "6h",
+        TimeRange::Hours24 => "24h",
+        TimeRange::Days3 => "3d",
+    };
+    
+    tracing::debug!(
+        "GET /api/clusters/overview/compaction-details?time_range={}", 
+        time_range_str
+    );
+
+    let stats = state
+        .overview_service
+        .get_compaction_detail_stats(cluster.id, time_range_str)
+        .await?;
+
+    Ok(Json(stats))
 }

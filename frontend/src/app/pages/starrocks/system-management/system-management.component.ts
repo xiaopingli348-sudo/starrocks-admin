@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 
 import { NbDialogService, NbToastrService, NbDialogRef } from '@nebular/theme';
@@ -111,13 +112,26 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
     private clusterContext: ClusterContextService,
     private dialogService: NbDialogService,
     private toastrService: NbToastrService,
-    private systemFunctionService: SystemFunctionService
+    private systemFunctionService: SystemFunctionService,
+    private route: ActivatedRoute,
+    private router: Router
   ) {
     // Get clusterId from ClusterContextService
     this.clusterId = this.clusterContext.getActiveClusterId() || 0;
   }
 
   ngOnInit() {
+    // 处理查询参数
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      if (params['function'] === 'compactions') {
+        // 找到compactions功能并直接跳转
+        const compactionsFunction = this.systemFunctions.find(f => f.name === 'compactions');
+        if (compactionsFunction) {
+          this.selectFunction(compactionsFunction);
+        }
+      }
+    });
+
     // Subscribe to active cluster changes
     this.clusterContext.activeCluster$
       .pipe(takeUntil(this.destroy$))
@@ -644,6 +658,15 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
 
   // 返回上一级
   goBack() {
+    // 检查是否从概览页面跳转过来的
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      if (params['from'] === 'overview') {
+        // 返回到集群概览页面
+        this.router.navigate(['/pages/starrocks/overview']);
+        return;
+      }
+    });
+
     if (this.navigationHistory.length > 1) {
       // 弹出当前层级
       this.navigationHistory.pop();
@@ -655,8 +678,8 @@ export class SystemManagementComponent implements OnInit, OnDestroy {
       this.loadFunctionData(previousHistory.functionName, previousHistory.nestedPath);
     } else {
       // 返回到功能列表
-    this.selectedFunction = null;
-    this.functionData = [];
+      this.selectedFunction = null;
+      this.functionData = [];
       this.functionDataSource.load([]);
       this.navigationHistory = [];
       this.navigationState = {

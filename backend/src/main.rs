@@ -142,6 +142,10 @@ pub struct AppState {
             services::SchemaChangeStats,
             services::CompactionStats,
             services::BECompactionScore,
+            services::CompactionDetailStats,
+            services::TopPartitionByScore,
+            services::CompactionTaskStats,
+            services::CompactionDurationStats,
             services::SessionStats,
             services::RunningQuery,
             services::NetworkIOStats,
@@ -400,6 +404,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/clusters/overview/capacity-prediction",
             get(handlers::overview::get_capacity_prediction),
+        )
+        .route(
+            "/api/clusters/overview/compaction-details",
+            get(handlers::overview::get_compaction_detail_stats),
         )
         .with_state(Arc::clone(&app_state_arc))
         .layer(axum_middleware::from_fn_with_state(auth_state, middleware::auth_middleware));
