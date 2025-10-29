@@ -14,6 +14,7 @@ import {
   CapacityPrediction,
   TopTableBySize,
   TopTableByAccess,
+  CompactionDetailStats,
 } from '../../../@core/data/overview.service';
 import { ClusterContextService } from '../../../@core/data/cluster-context.service';
 
@@ -29,6 +30,7 @@ export class ClusterOverviewComponent implements OnInit, OnDestroy, AfterViewIni
   resourceTrends: ResourceTrends | null = null;
   dataStatistics: DataStatistics | null = null;
   capacityPrediction: CapacityPrediction | null = null;
+  compactionDetails: CompactionDetailStats | null = null;
   activeSessions: number = 0;
   runningQueries: number = 0;
   activeUsers1h: number = 0;
@@ -192,7 +194,20 @@ export class ClusterOverviewComponent implements OnInit, OnDestroy, AfterViewIni
           }
           
           this.toastr.danger(errorMsg, '错误');
-        this.loading = false;
+          this.loading = false;
+        }
+      });
+    
+    // Load compaction detail stats separately
+    this.overviewService.getCompactionDetailStats(this.timeRange)
+      .subscribe({
+        next: (details) => {
+          this.compactionDetails = details;
+        },
+        error: (err) => {
+          console.warn('[ClusterOverview] Failed to load compaction details:', err);
+          // Don't show error to user - compaction details are optional
+          this.compactionDetails = null;
         }
       });
   }
@@ -1277,5 +1292,27 @@ export class ClusterOverviewComponent implements OnInit, OnDestroy, AfterViewIni
     const b = parseInt(hex.substring(4, 6), 16);
     
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  /**
+   * Get CSS class for compaction score status indication
+   * 
+   * @param score Compaction score value
+   * @returns CSS class name for styling
+   */
+  getScoreStatusClass(score: number): string {
+    if (score > 100) return 'text-danger';   // Critical
+    if (score > 50) return 'text-warning';   // Warning
+    return 'text-success';                   // Normal
+  }
+
+  // 导航到compaction列表页面
+  navigateToCompactions() {
+    this.router.navigate(['/pages/starrocks/system'], { 
+      queryParams: { 
+        function: 'compactions',
+        from: 'overview'  // 标记来源，用于返回功能
+      } 
+    });
   }
 }

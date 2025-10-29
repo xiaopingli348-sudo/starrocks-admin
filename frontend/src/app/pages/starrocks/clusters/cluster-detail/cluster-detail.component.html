@@ -3,7 +3,7 @@
     <nb-card>
       <nb-card-header>
         <div class="d-flex justify-content-between align-items-center">
-          <h5>{{ cluster.name }}</h5>
+          <h5>{{ cluster?.name || '未知集群' }}</h5>
           <div>
             <button nbButton status="info" size="small" (click)="editCluster()" class="me-2">
               <nb-icon icon="edit-outline"></nb-icon> 编辑
@@ -19,13 +19,13 @@
           <div class="col-md-6">
             <h6>基本信息</h6>
             <table class="table">
-              <tr><td>集群名称:</td><td>{{ cluster.name }}</td></tr>
-              <tr><td>描述:</td><td>{{ cluster.description || '-' }}</td></tr>
-              <tr><td>FE 地址:</td><td>{{ cluster.fe_host }}:{{ cluster.fe_http_port }}</td></tr>
-              <tr><td>查询端口:</td><td>{{ cluster.fe_query_port }}</td></tr>
-              <tr><td>用户名:</td><td>{{ cluster.username }}</td></tr>
-              <tr><td>Catalog:</td><td>{{ cluster.catalog }}</td></tr>
-              <tr><td>创建时间:</td><td>{{ cluster.created_at | date:'yyyy-MM-dd HH:mm:ss' }}</td></tr>
+              <tr><td>集群名称:</td><td>{{ cluster?.name }}</td></tr>
+              <tr><td>描述:</td><td>{{ cluster?.description || '-' }}</td></tr>
+              <tr><td>FE 地址:</td><td>{{ cluster?.fe_host }}:{{ cluster?.fe_http_port }}</td></tr>
+              <tr><td>查询端口:</td><td>{{ cluster?.fe_query_port }}</td></tr>
+              <tr><td>用户名:</td><td>{{ cluster?.username }}</td></tr>
+              <tr><td>Catalog:</td><td>{{ cluster?.catalog }}</td></tr>
+              <tr><td>创建时间:</td><td>{{ cluster?.created_at | date:'yyyy-MM-dd HH:mm:ss' }}</td></tr>
             </table>
           </div>
           <div class="col-md-6">

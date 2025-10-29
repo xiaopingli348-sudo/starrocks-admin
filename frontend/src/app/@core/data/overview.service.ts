@@ -199,6 +199,38 @@ export interface BECompactionScore {
   score: number;
 }
 
+// Compaction Detail Stats for Storage-Compute Separation Architecture
+// Provides detailed compaction monitoring including:
+// - Top 10 partitions by compaction score
+// - Running and finished task statistics
+// - Duration statistics (min, max, avg)
+export interface CompactionDetailStats {
+  topPartitions: TopPartitionByScore[];
+  taskStats: CompactionTaskStats;
+  durationStats: CompactionDurationStats;
+}
+
+export interface TopPartitionByScore {
+  dbName: string;
+  tableName: string;
+  partitionName: string;
+  maxScore: number;
+  avgScore: number;
+  p50Score: number;
+}
+
+export interface CompactionTaskStats {
+  runningCount: number;
+  finishedCount: number;
+  totalCount: number;
+}
+
+export interface CompactionDurationStats {
+  minDurationMs: number;
+  maxDurationMs: number;
+  avgDurationMs: number;
+}
+
 export interface SessionStats {
   active_users_1h: number;
   active_users_24h: number;
@@ -291,6 +323,19 @@ export class OverviewService {
 
   getExtendedClusterOverview(timeRange: string = '24h'): Observable<ExtendedClusterOverview> {
     return this.api.get(`/clusters/overview/extended`, { time_range: timeRange });
+  }
+
+  /**
+   * Get compaction detail statistics for storage-compute separation architecture
+   * 
+   * @param timeRange Time range for task statistics: 1h, 6h, 24h, 3d (default: 1h)
+   * @returns CompactionDetailStats including:
+   *   - Top 10 partitions by compaction score
+   *   - Running and finished task counts
+   *   - Duration statistics (min, max, avg)
+   */
+  getCompactionDetailStats(timeRange: string = '1h'): Observable<CompactionDetailStats> {
+    return this.api.get(`/clusters/overview/compaction-details`, { time_range: timeRange });
   }
 
   /**

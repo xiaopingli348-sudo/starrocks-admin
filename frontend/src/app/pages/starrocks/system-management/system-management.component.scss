@@ -1,5 +1,5 @@
 .system-management-container {
-  padding: 1rem;
+  padding: 0 0 1rem 0; // 只保留底部padding，移除左右padding以与Tab栏对齐
 }
 
 // 添加功能弹窗样式

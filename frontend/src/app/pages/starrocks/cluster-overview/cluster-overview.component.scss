@@ -1,7 +1,7 @@
 @use '@nebular/theme/styles/theming' as *;
 
 .cluster-overview {
-  padding: 1rem;
+  padding: 0 0 1rem 0; // 只保留底部padding，移除左右padding以与Tab栏对齐
 
   .header-section {
     display: flex;
@@ -461,4 +461,41 @@
 
 .text-info {
   color: nb-theme(color-info-default);
+}
+
+// ==================== Compaction 监控样式 ====================
+
+.score-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  
+  &.text-success {
+    background-color: rgba(0, 214, 143, 0.1);
+  }
+  
+  &.text-warning {
+    background-color: rgba(255, 170, 0, 0.1);
+  }
+  
+  &.text-danger {
+    background-color: rgba(255, 61, 113, 0.1);
+  }
+}
+
+.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
 }
