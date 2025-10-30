@@ -317,6 +317,32 @@ enabled = true
 web_root = "web"
 ```
 
+## 日志配置说明（后端）
+
+> 为了安全和环境灵活性，后端 `.env.development`、`.env.production` 日志配置文件未纳入仓库，请**按需在 backend 目录下自行创建**。
+
+- **开发环境**：彩色格式化日志，利于本地调试
+- **生产环境**：结构化 JSON 日志，方便聚合收集
+
+**范例：backend/.env.development**
+```env
+LOG_FORMAT=pretty
+RUST_LOG=starrocks_admin=debug,tower_http=debug
+RUST_LOG_STYLE=always
+```
+**范例：backend/.env.production**
+```env
+LOG_FORMAT=json
+RUST_LOG=starrocks_admin=info,tower_http=warn
+RUST_LOG_STYLE=never
+```
+
+**切换方法：**
+- 开发调试：`cp .env.development .env`
+- 生产上线：`cp .env.production .env`
+
+本项目已自动识别并加载 `.env` 文件，无需手动 export 环境变量。
+
 ## 开发指南
 
 ### 热重载开发
