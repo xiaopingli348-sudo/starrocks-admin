@@ -88,6 +88,26 @@ EOF
 echo -e "${GREEN}✓ 配置文件已创建${NC}"
 echo ""
 
+# 设置编译优化环境变量
+# 根据 CPU 核心数设置并行任务数（留一些核心给系统和其他进程）
+CPU_CORES=$(nproc 2>/dev/null || echo "8")
+# 使用约 75% 的核心数，但至少 4 个，最多 14 个
+PARALLEL_JOBS=$((CPU_CORES * 3 / 4))
+if [ $PARALLEL_JOBS -lt 4 ]; then
+    PARALLEL_JOBS=4
+elif [ $PARALLEL_JOBS -gt 14 ]; then
+    PARALLEL_JOBS=14
+fi
+
+export CARGO_BUILD_JOBS=$PARALLEL_JOBS
+export CARGO_INCREMENTAL=1
+export RUSTC_WRAPPER=""  # 如果使用 sccache，会在这里设置
+
+echo -e "${BLUE}[INFO]${NC} 编译优化配置:"
+echo -e "  - 并行任务数: $PARALLEL_JOBS (CPU 核心数: $CPU_CORES)"
+echo -e "  - 增量编译: 启用"
+echo ""
+
 # 检查是否需要首次编译
 echo -e "${YELLOW}[3/4]${NC} 检查编译状态..."
 cd "$BACKEND_DIR"
@@ -119,29 +139,60 @@ echo -e "按 Ctrl+C 停止服务"
 echo -e "${GREEN}════════════════════════════════════════${NC}"
 echo ""
 
+# 检测是否在 Windows 文件系统上（/mnt/），需要使用轮询模式
+# WSL 在 Windows 文件系统上无法使用 inotify，需要使用轮询
+cd "$BACKEND_DIR"
+USE_POLLING=false
+if [[ "$(pwd)" == /mnt/* ]] || [[ "$PWD" == /mnt/* ]]; then
+    USE_POLLING=true
+    echo -e "${YELLOW}[INFO]${NC} 检测到 Windows 文件系统 (/mnt/)，启用轮询模式以支持文件监听"
+    echo -e "${YELLOW}[INFO]${NC} 轮询模式会每2秒检查一次文件变化（性能略有影响但可以正常工作）"
+fi
+
 # 使用优化的 cargo-watch 配置
 # 只监听源代码文件，排除所有编译输出和日志目录
-cargo watch \
-    --watch "src" \
-    --watch "Cargo.toml" \
-    --ignore "target/**" \
-    --ignore "logs/**" \
-    --ignore "data/**" \
-    --ignore "conf/**" \
-    --ignore "*.log" \
-    --ignore "*.pid" \
-    --ignore "*.tmp" \
-    --ignore "*.swp" \
-    --ignore "*.swo" \
-    --ignore ".git/**" \
-    --ignore "node_modules/**" \
-    --ignore "dist/**" \
-    --ignore "build/**" \
-    --ignore ".angular/**" \
-    --ignore "coverage/**" \
-    --ignore "*.lock" \
-    --ignore "*.orig" \
-    --ignore "*.rej" \
-    --delay 1 \
-    --clear \
+WATCH_ARGS=(
+    --watch "src"
+    --watch "Cargo.toml"
+    --ignore "target/**"
+    --ignore "logs/**"
+    --ignore "data/**"
+    --ignore "conf/**"
+    --ignore "*.log"
+    --ignore "*.pid"
+    --ignore "*.tmp"
+    --ignore "*.swp"
+    --ignore "*.swo"
+    --ignore ".git/**"
+    --ignore "node_modules/**"
+    --ignore "dist/**"
+    --ignore "build/**"
+    --ignore ".angular/**"
+    --ignore "coverage/**"
+    --ignore "*.lock"
+    --ignore "*.orig"
+    --ignore "*.rej"
+    --delay 1
+    --clear
     -x "run --bin starrocks-admin"
+)
+
+# 如果在 Windows 文件系统上，添加轮询选项
+if [ "$USE_POLLING" = "true" ]; then
+    # cargo-watch 在较新版本中支持 --poll 选项
+    # 如果版本不支持，使用环境变量 CARGO_WATCH_POLL_INTERVAL
+    export CARGO_WATCH_POLL_INTERVAL=2
+    WATCH_ARGS+=(--poll)
+    echo -e "${BLUE}[INFO]${NC} 使用轮询模式（每2秒检查一次文件变化）"
+fi
+
+echo -e "${BLUE}[INFO]${NC} 启动热重载监听..."
+echo -e "${BLUE}[INFO]${NC} 修改任何 .rs 文件将自动触发重新编译并重启"
+echo -e "${BLUE}[INFO]${NC} 编译将使用 $PARALLEL_JOBS 个并行任务"
+echo ""
+
+# 确保环境变量被 cargo watch 继承
+export CARGO_BUILD_JOBS=$PARALLEL_JOBS
+export CARGO_INCREMENTAL=1
+
+cargo watch "${WATCH_ARGS[@]}"
