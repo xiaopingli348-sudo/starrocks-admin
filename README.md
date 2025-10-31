@@ -413,6 +413,71 @@ make dev
 
 ## 修改记录
 
+### 2025-10-31: 功能分支合并 - 日志优化、查询修复、构建优化
+
+#### 会话主要目的
+- 将三个功能分支合并到主分支
+- 日志格式优化功能
+- 运行中查询功能修复
+- Rust 编译速度优化
+
+#### 完成的主要任务
+1. **日志格式优化** (`feature/log-format-improvement`)
+   - 支持开发/生产环境日志格式切换（LOG_FORMAT 环境变量）
+   - 集成 dotenvy 自动加载 .env 文件
+   - 实现美化彩色日志（开发）与结构化 JSON 日志（生产）
+   - 添加日志配置指南文档
+
+2. **查询功能修复** (`feature/fix-running-queries`)
+   - 修复运行中的查询功能列名匹配问题（ScanRows vs ProcessRows）
+   - 使用大小写不敏感匹配查找列名
+   - 将 Sql 列设为可选，使用 ExecProgress 作为备用
+   - 添加 HTTP API 和 MySQL 客户端双重备用方案
+   - 修复 Angular CommonJS 警告（添加 nearley 和 sql-formatter）
+
+3. **构建优化** (`feature/build-optimization`)
+   - 自动检测 CPU 核心数并设置并行任务数（使用 75% 核心，最多 14 个）
+   - 优化 codegen-units 从 1 改为 16，平衡编译速度和代码质量
+   - 改进启动脚本，自动设置 CARGO_BUILD_JOBS 环境变量
+   - 添加详细的编译速度优化指南文档
+
+4. **分支管理实践**
+   - 创建 Git 分支管理实战指南文档
+   - 记录提交拆分与分支重组的完整流程
+
+#### 关键决策和解决方案
+- **分支分离**：确保每个功能分支主题单一，避免功能混杂
+- **合并策略**：使用 Fast-forward 和 Merge commit 相结合的策略
+- **文档完善**：为分支管理操作创建实战指南，便于团队参考
+
+#### 使用的技术栈
+- Rust: cargo build, cargo watch, 编译优化配置
+- Angular: CommonJS 依赖配置
+- Git: 分支管理、提交拆分、合并策略
+- StarRocks: SHOW PROC 命令解析
+
+#### 修改的文件
+
+**日志优化相关：**
+- `backend/src/main.rs` - 集成 dotenvy 和日志初始化
+- `backend/Cargo.toml` - 更新 tracing 依赖
+- `backend/.env.development` - 开发环境日志配置（新建）
+- `backend/.env.production` - 生产环境日志配置（新建）
+- `README.md` - 添加日志配置指南
+
+**查询功能修复：**
+- `backend/src/handlers/query.rs` - 修复列名匹配和解析逻辑
+- `backend/src/services/starrocks_client.rs` - 改进查询解析和错误处理
+- `frontend/angular.json` - 修复 CommonJS 警告
+
+**构建优化：**
+- `backend/.cargo/config.toml` - 优化编译配置
+- `scripts/dev/start_backend_dev_optimized.sh` - 编译优化脚本
+- `dev-doc/编译速度优化.md` - 优化指南文档（新建）
+
+**文档：**
+- `dev-doc/Git分支管理实战指南-提交拆分与分支重组.md` - 分支管理实战指南（新建）
+
 ### 2025-01-25: 优化构建系统和修复代码质量问题
 
 #### 会话主要目的
