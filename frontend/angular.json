@@ -55,7 +55,9 @@
               "echarts",
               "lodash",
               "zrender/lib/svg/svg",
-              "zrender/lib/vml/vml"
+              "zrender/lib/vml/vml",
+              "nearley",
+              "sql-formatter"
             ],
             "vendorChunk": true,
             "extractLicenses": false,
