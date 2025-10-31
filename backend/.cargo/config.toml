@@ -5,8 +5,8 @@
 # 使用增量编译
 incremental = true
 
-# 并行编译
-jobs = 4
+# 并行编译 - 根据 CPU 核心数自动调整（在启动脚本中设置）
+# jobs = 4  # 注释掉，使用环境变量 CARGO_BUILD_JOBS
 
 # 目标目录
 target-dir = "target"
@@ -22,8 +22,9 @@ debug = true
 split-debuginfo = "unpacked"
 incremental = true
 
-# 减少编译时间
-codegen-units = 1
+# 增加代码生成单元以加快编译速度（默认是 256，这里设置为 16 作为平衡）
+# codegen-units = 1  # 会显著减慢编译，改用更大的值
+codegen-units = 16
 
 [profile.dev.package."*"]
 # 第三方库使用更高级别的优化
