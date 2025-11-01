@@ -3,9 +3,10 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use std::sync::Arc;
+use std::env;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{fmt, EnvFilter, prelude::*};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -184,32 +185,67 @@ impl utoipa::Modify for SecurityAddon {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load configuration first
-    let config = Config::load()?;
+fn setup_logging(config: &Config) {
+    // 获取日志风格: "json" 或 "pretty"
+    let log_format = env::var("LOG_FORMAT").unwrap_or_else(|_| "pretty".into());
+    
+    // 加载日志级别和过滤器
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(&config.logging.level));
 
-    // Initialize logging
-    let log_filter = tracing_subscriber::EnvFilter::new(&config.logging.level);
+    let mut registry = tracing_subscriber::registry().with(env_filter);
 
-    let registry = tracing_subscriber::registry().with(log_filter);
+    // 根据格式选择不同的格式化层
+    let fmt_layer = match log_format.as_str() {
+        "json" => fmt::layer()
+            .json()
+            .with_target(true)
+            .with_current_span(false)
+            .boxed(),
+        _ => fmt::layer()
+            .pretty()
+            .with_target(true)
+            .with_ansi(true)
+            .boxed(),
+    };
 
-    // Add file logging if configured
+    // 添加文件日志（如果配置了）
     if let Some(log_file) = &config.logging.file {
-        // Ensure log directory exists
+        // 确保日志目录存在
         if let Some(parent) = std::path::Path::new(log_file).parent() {
             let _ = std::fs::create_dir_all(parent);
         }
 
         let file_appender = tracing_appender::rolling::daily("logs", "starrocks-admin.log");
         let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-        registry
-            .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
-            .with(tracing_subscriber::fmt::layer())
-            .init();
+        
+        // 文件日志使用 JSON 格式（便于日志收集系统处理）
+        let file_fmt_layer = fmt::layer()
+            .json()
+            .with_writer(non_blocking)
+            .with_target(true)
+            .with_current_span(false);
+        
+        registry = registry
+            .with(file_fmt_layer)
+            .with(fmt_layer);
     } else {
-        registry.with(tracing_subscriber::fmt::layer()).init();
+        registry = registry.with(fmt_layer);
     }
+
+    registry.init();
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 加载 .env 文件（如果存在）
+    dotenvy::dotenv().ok();
+    
+    // Load configuration first
+    let config = Config::load()?;
+
+    // Initialize logging
+    setup_logging(&config);
     tracing::info!("StarRocks Admin starting up");
     tracing::info!("Configuration loaded successfully");
 
