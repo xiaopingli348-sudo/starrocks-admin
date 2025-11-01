@@ -193,23 +193,7 @@ fn setup_logging(config: &Config) {
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(&config.logging.level));
 
-    let mut registry = tracing_subscriber::registry().with(env_filter);
-
-    // 根据格式选择不同的格式化层
-    let fmt_layer = match log_format.as_str() {
-        "json" => fmt::layer()
-            .json()
-            .with_target(true)
-            .with_current_span(false)
-            .boxed(),
-        _ => fmt::layer()
-            .pretty()
-            .with_target(true)
-            .with_ansi(true)
-            .boxed(),
-    };
-
-    // 添加文件日志（如果配置了）
+    // 构建 registry，根据是否配置文件日志来决定
     if let Some(log_file) = &config.logging.file {
         // 确保日志目录存在
         if let Some(parent) = std::path::Path::new(log_file).parent() {
@@ -226,14 +210,56 @@ fn setup_logging(config: &Config) {
             .with_target(true)
             .with_current_span(false);
         
-        registry = registry
-            .with(file_fmt_layer)
-            .with(fmt_layer);
+        // 根据格式选择控制台输出层
+        match log_format.as_str() {
+            "json" => {
+                let fmt_layer = fmt::layer()
+                    .json()
+                    .with_target(true)
+                    .with_current_span(false);
+                tracing_subscriber::registry()
+                    .with(env_filter)
+                    .with(file_fmt_layer)
+                    .with(fmt_layer)
+                    .init();
+            }
+            _ => {
+                let fmt_layer = fmt::layer()
+                    .pretty()
+                    .with_target(true)
+                    .with_ansi(true);
+                tracing_subscriber::registry()
+                    .with(env_filter)
+                    .with(file_fmt_layer)
+                    .with(fmt_layer)
+                    .init();
+            }
+        }
     } else {
-        registry = registry.with(fmt_layer);
+        // 根据格式选择不同的格式化层
+        match log_format.as_str() {
+            "json" => {
+                let fmt_layer = fmt::layer()
+                    .json()
+                    .with_target(true)
+                    .with_current_span(false);
+                tracing_subscriber::registry()
+                    .with(env_filter)
+                    .with(fmt_layer)
+                    .init();
+            }
+            _ => {
+                let fmt_layer = fmt::layer()
+                    .pretty()
+                    .with_target(true)
+                    .with_ansi(true);
+                tracing_subscriber::registry()
+                    .with(env_filter)
+                    .with(fmt_layer)
+                    .init();
+            }
+        }
     }
-
-    registry.init();
 }
 
 #[tokio::main]
