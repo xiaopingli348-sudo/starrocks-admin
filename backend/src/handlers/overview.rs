@@ -284,7 +284,15 @@ pub async fn get_extended_cluster_overview(
     let overview = state
         .overview_service
         .get_extended_overview(cluster.id, params.time_range)
-        .await?;
+        .await
+        .map_err(|e| {
+            tracing::error!(
+                "Failed to get extended cluster overview for cluster {}: {}",
+                cluster.id,
+                e
+            );
+            e
+        })?;
 
     Ok(Json(overview))
 }

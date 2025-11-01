@@ -53,6 +53,10 @@ pub enum ApiError {
     #[error("Internal error: {0}")]
     InternalError(String),
 
+    // Not found errors 3xxx (resource not found)
+    #[error("Not found: {0}")]
+    NotFound(String),
+
     // System Function errors 6xxx
     #[error("System function not found: {0}")]
     SystemFunctionNotFound(String),
@@ -122,9 +126,9 @@ impl ApiError {
         Self::ValidationError(message.into())
     }
 
-    /// Helper to create not found error
+    /// Helper to create not found error (returns 404)
     pub fn not_found(message: impl Into<String>) -> Self {
-        Self::SystemFunctionNotFound(message.into())
+        Self::NotFound(message.into())
     }
 
     /// Helper to create invalid SQL error
@@ -159,6 +163,7 @@ impl ApiError {
             // Resource errors 3xxx
             Self::QueryNotFound { .. } => 3001,
             Self::QueryKillFailed(_) => 3002,
+            Self::NotFound(_) => 3003,
 
             // Validation errors 4xxx
             Self::ValidationError(_) => 4001,

@@ -1067,22 +1067,37 @@ impl OverviewService {
         let data_stats = self.get_data_statistics(cluster_id).await.ok();
 
         // Module 7: Materialized Views (P1)
-        let mv_stats = self.get_mv_stats(cluster_id).await?;
+        let mv_stats = self.get_mv_stats(cluster_id).await.map_err(|e| {
+            tracing::error!("Failed to get MV stats for cluster {}: {}", cluster_id, e);
+            e
+        })?;
 
         // Module 8: Load Jobs (P1)
-        let load_jobs = self.get_load_job_stats(cluster_id).await?;
+        let load_jobs = self.get_load_job_stats(cluster_id).await.map_err(|e| {
+            tracing::error!("Failed to get load job stats for cluster {}: {}", cluster_id, e);
+            e
+        })?;
 
         // Module 9: Transactions (P1)
         let transactions = self.get_transaction_stats(&latest);
 
         // Module 10: Schema Changes (P1)
-        let schema_changes = self.get_schema_change_stats(cluster_id).await?;
+        let schema_changes = self.get_schema_change_stats(cluster_id).await.map_err(|e| {
+            tracing::error!("Failed to get schema change stats for cluster {}: {}", cluster_id, e);
+            e
+        })?;
 
         // Module 11: Compaction (P1)
-        let compaction = self.get_compaction_stats(cluster_id).await?;
+        let compaction = self.get_compaction_stats(cluster_id).await.map_err(|e| {
+            tracing::error!("Failed to get compaction stats for cluster {}: {}", cluster_id, e);
+            e
+        })?;
 
         // Module 12: Sessions (P1)
-        let sessions = self.get_session_stats(cluster_id).await?;
+        let sessions = self.get_session_stats(cluster_id).await.map_err(|e| {
+            tracing::error!("Failed to get session stats for cluster {}: {}", cluster_id, e);
+            e
+        })?;
 
         // Module 13: Network & IO (P1)
         let network_io = self.calculate_network_io_stats(&latest);
